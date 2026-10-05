@@ -15,6 +15,7 @@ FLOAT_TOLERANCE = 1e-4  # relative, for numbers computed in closed form
 # Fitted models come out of a local optimiser whose last iterations differ across
 # platforms and BLAS builds: 1.3001 on Linux against 1.3011 on Windows for one max error.
 FIT_TOLERANCE = 5e-3
+COUNT_TOLERANCE = 1e-2
 
 
 def _builder():
@@ -33,6 +34,10 @@ def _assert_matches(actual, expected, path="root"):
     elif isinstance(expected, float):
         rel = FIT_TOLERANCE if ".models." in path else FLOAT_TOLERANCE
         assert actual == pytest.approx(expected, rel=rel, abs=1e-9), path
+    elif isinstance(expected, int) and ".models." in path:
+        # arbitrage counts of a fitted wing move by a few grid points with the optimiser
+        # (1295 on Linux, 1298 on Windows); a zero must stay exactly zero
+        assert actual == pytest.approx(expected, rel=COUNT_TOLERANCE, abs=0), path
     else:
         assert actual == expected, path
 
@@ -61,5 +66,7 @@ def test_arbitrage_free_models_are_clean_and_the_free_fit_is_closest(surface_out
     models = surface_output.models
     for name in ("SSVI", "eSSVI"):
         assert sum(models[name].violations.values()) == 0, name
+        found = surface_output.between_pillars[name]
+        assert found["butterfly"] == found["calendar"] == 0, name
     rmse = {name: m.errors["rmse_vol_points"] for name, m in models.items()}
     assert min(rmse, key=rmse.get) == "SVI per slice"

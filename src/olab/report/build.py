@@ -96,6 +96,12 @@ def _models_section(surface: SurfaceOutput) -> list[str]:
         for n, d in MODEL_NOTES.items()
     )
     quotes = surface.models[next(iter(surface.models))].errors["quotes"]
+    dense = "; ".join(
+        f"{html_escape.escape(name)}: {found['butterfly']:,} butterfly and "
+        f"{found['calendar']:,} calendar points"
+        for name, found in surface.between_pillars.items()
+    )
+    maturities = next(iter(surface.between_pillars.values()))["maturities"]
     return [
         "<h2>Fitting the surface: fit against arbitrage</h2>",
         f"<ul class='note'>{notes}</ul>",
@@ -111,7 +117,9 @@ def _models_section(surface: SurfaceOutput) -> list[str]:
             "earlier one), split between the range where the expiry is quoted and the wings "
             "the model extrapolates. The 30-day vol is the continuous log-contract "
             "replication on each model's thirty-day slice; it reads the extrapolated wings, "
-            "which is why the free fit, closest to the quotes, is furthest from the index."
+            "which is why the free fit, closest to the quotes, is furthest from the CBOE "
+            f"recipe on the same chain. Between the fitted expiries, on {maturities:,} "
+            f"interpolated maturities: {dense}."
         ),
         smile_chart(surface.quotes.table, surface.surfaces),
     ]

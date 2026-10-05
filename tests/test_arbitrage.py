@@ -3,6 +3,7 @@ import pandas as pd
 
 from olab.surface.arbitrage import (
     K_GRID,
+    between_pillars,
     butterfly_violations,
     calendar_violations,
     durrleman_g,
@@ -67,3 +68,20 @@ def test_executable_vertical_and_butterfly_are_counted_per_type():
     thin = _side("C", [1.0, 1.0], [2.0, 2.0], expiry="thin", strikes=(1.0, 2.0))
     found = tradable_chain_arbitrage(pd.concat([calls, puts, thin]))
     assert found == {"vertical": 1, "butterfly": 2, "checked_expiries": 2}
+
+
+class _Surface:
+    def __init__(self, variance_of_t):
+        self.variance_of_t = variance_of_t
+
+    def slice(self, maturity):
+        return flat(self.variance_of_t(maturity))
+
+
+def test_between_pillars_audits_every_interpolated_maturity():
+    maturities = np.linspace(0.1, 1.0, 10)
+    assert between_pillars(_Surface(lambda t: 0.04 * t), maturities) == {
+        "maturities": 10, "butterfly": 0, "calendar": 0}
+    # variance falling with time breaks calendar on every point of every pair
+    found = between_pillars(_Surface(lambda t: 0.05 - 0.04 * t), maturities)
+    assert found["calendar"] == 9 * len(K_GRID) and found["butterfly"] == 0

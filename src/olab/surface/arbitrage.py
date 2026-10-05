@@ -53,6 +53,20 @@ def calendar_violations(slices: Sequence[Slice], k: np.ndarray = K_GRID) -> int:
     return count
 
 
+def between_pillars(surface, maturities: np.ndarray, k: np.ndarray = K_GRID) -> dict[str, int]:
+    """Butterfly and calendar violations on maturities between the fitted expiries.
+
+    A surface audited only at its pillars can still cross itself in between; this reads the
+    interpolated slices the replication and any off-pillar price would use.
+    """
+    slices = [surface.slice(float(t)) for t in maturities]
+    return {
+        "maturities": len(slices),
+        "butterfly": sum(butterfly_violations(curve, k) for curve in slices),
+        "calendar": calendar_violations(slices, k),
+    }
+
+
 def _tradable_in_one_type(frame: pd.DataFrame, is_call: bool) -> dict[str, int]:
     frame = frame.sort_values("strike")
     strikes = frame["strike"].to_numpy(dtype=float)

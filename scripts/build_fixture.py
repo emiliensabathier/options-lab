@@ -33,6 +33,7 @@ def surface_numbers(output) -> dict:
         "refused": dict(output.quotes.refused),
         "chain_arbitrage": output.chain_arbitrage,
         "models": {name: asdict(model) for name, model in output.models.items()},
+        "between_pillars": output.between_pillars,
     }
 
 

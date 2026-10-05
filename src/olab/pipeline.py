@@ -20,7 +20,7 @@ from olab.premium.history import (
     swap_outcomes,
 )
 from olab.snapshot import Snapshot, load_snapshot
-from olab.surface.arbitrage import split_violations, tradable_chain_arbitrage
+from olab.surface.arbitrage import between_pillars, split_violations, tradable_chain_arbitrage
 from olab.surface.quotes import MIN_MATURITY, SurfaceQuotes, build_quotes, is_stale, screen_quotes
 from olab.surface.svi import fit_errors, fit_essvi, fit_ssvi, fit_svi_surface
 from olab.surface.varswap import THIRTY_DAYS, cboe_vix, replicated_variance
@@ -31,6 +31,8 @@ MODEL_NOTES = {
     "SSVI": "power-law surface, three shared parameters, arbitrage-free by theorem",
     "eSSVI": "SSVI shape per expiry, chained by wing-slope constraints",
 }
+ARBITRAGE_FREE = ("SSVI", "eSSVI")  # audited between pillars too
+DENSE_MATURITIES = 400
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class SurfaceOutput:
     quotes: SurfaceQuotes
     chain_arbitrage: dict[str, dict[str, int]]
     models: dict[str, ModelResult]
+    between_pillars: dict[str, dict[str, int]]
     surfaces: dict[str, object]
     cboe: dict
 
@@ -96,6 +99,7 @@ def run_surface(chain_csv: Path, meta_json: Path) -> SurfaceOutput:
         "eSSVI": fit_essvi(table, svi),
     }
     models = {name: _evaluate(name, surface, table) for name, surface in surfaces.items()}
+    dense = np.linspace(table["T"].min(), table["T"].max(), DENSE_MATURITIES)
     any_age, _ = screen_quotes(snapshot.quotes.loc[snapshot.quotes["T"] >= MIN_MATURITY])
     discounts = {expiry: fwd.discount for expiry, fwd in quotes.forwards.items()}
     return SurfaceOutput(
@@ -107,6 +111,7 @@ def run_surface(chain_csv: Path, meta_json: Path) -> SurfaceOutput:
             "Out-of-the-money side only": tradable_chain_arbitrage(table),
         },
         models=models,
+        between_pillars={name: between_pillars(surfaces[name], dense) for name in ARBITRAGE_FREE},
         surfaces=surfaces,
         # zero bids stay in: the recipe's truncation rule reads them
         cboe=cboe_vix(snapshot.quotes.loc[~is_stale(snapshot.quotes, snapshot.as_of)], discounts),

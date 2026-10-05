@@ -106,6 +106,18 @@
         },
         "replicated_vix": 14.992943185855134
       }
+    },
+    "between_pillars": {
+      "SSVI": {
+        "maturities": 400,
+        "butterfly": 0,
+        "calendar": 0
+      },
+      "eSSVI": {
+        "maturities": 400,
+        "butterfly": 0,
+        "calendar": 0
+      }
     }
   },
   "premium": {
