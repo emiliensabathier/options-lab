@@ -11,7 +11,10 @@ import pytest
 
 from conftest import FIXTURES, ROOT
 
-FLOAT_TOLERANCE = 1e-4  # relative; optimisers may differ in the last digits across platforms
+FLOAT_TOLERANCE = 1e-4  # relative, for numbers computed in closed form
+# Fitted models come out of a local optimiser whose last iterations differ across
+# platforms and BLAS builds: 1.3001 on Linux against 1.3011 on Windows for one max error.
+FIT_TOLERANCE = 5e-3
 
 
 def _builder():
@@ -28,7 +31,8 @@ def _assert_matches(actual, expected, path="root"):
         for key in expected:
             _assert_matches(actual[key], expected[key], f"{path}.{key}")
     elif isinstance(expected, float):
-        assert actual == pytest.approx(expected, rel=FLOAT_TOLERANCE, abs=1e-9), path
+        rel = FIT_TOLERANCE if ".models." in path else FLOAT_TOLERANCE
+        assert actual == pytest.approx(expected, rel=rel, abs=1e-9), path
     else:
         assert actual == expected, path
 
