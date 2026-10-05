@@ -10,8 +10,8 @@ chain, and the premium a seller of that volatility has collected since 1990.
 ### The surface: closeness to quotes against freedom from arbitrage
 
 One SPX chain captured 2026-10-05 16:09 UTC (15-minute delayed quotes, index at 7,761.75),
-43 expiries from one week to just over a year, 7,425 out-of-the-money quotes after
-screening. Four models were fitted to the same quotes and audited the same way.
+42 expiries fitted from one week to just over a year (a 43rd is refused: too few
+put-call pairs to pin its forward), 7,425 out-of-the-money quotes after screening. Four models were fitted to the same quotes and audited the same way.
 
 | Model | RMSE (vol pts) | Inside bid-ask | Butterfly arbitrage, quoted / wings | Calendar arbitrage, quoted / wings | 30-day replicated vol |
 | --- | --- | --- | --- | --- | --- |
@@ -27,21 +27,26 @@ extrapolates. The CBOE white-paper recipe run on the same chain gives **15.31** 
 published VIX of **15.57**.
 
 There is no free lunch here, and the table says where it is paid for. Five free
-parameters per expiry fit every slice to an eighth of a vol point, and stay clean wherever
-the market quotes, but the wings they extrapolate imply negative densities and crossing
-slices on thousands of grid points. The replication integral reads exactly those wings,
-so the model closest to the quotes gives the 30-day vol furthest from the index. Adding
-penalties, the approach of most open-source SVI calibrators, removes most of the wing
-arbitrage but moves calendar violations inside the quoted range, and its worst miss is 20
-vol points. The two SSVI fits are arbitrage-free by construction (SSVI by theorem, eSSVI by
-checked constraints) and cost about two vol points of fit: on the test fixture, 2.5 to 3
-points out to one month and about one point at three and six months, because one SSVI
-shape per expiry cannot follow the curvature of a short-dated smile.
+parameters per expiry fit the surface to an overall RMSE of 0.13 vol points (0.2 to 0.25 on
+the expiries under two weeks, a worst single miss of 1.7) and are nearly clean where the
+market quotes, but the wings they extrapolate imply negative densities and crossing slices
+on thousands of grid points. The replication integral reads those wings, and the free fit
+gives the 30-day vol furthest from the CBOE recipe on the same chain (16.03 against
+15.31). Adding penalties, the approach taken by the open-source SVI calibrators this
+project started from, removes most of the wing arbitrage but moves calendar violations
+inside the quoted range. The two SSVI fits are arbitrage-free by construction (SSVI by
+theorem, eSSVI by checked constraints) and cost about two vol points of fit: eSSVI misses
+by 2 to 4 points out to one month, about one point at three to six months and under half a
+point at one year. Every constrained model, penalised SVI included, misses its worst quote
+by about 20 points. One SSVI shape per expiry cannot follow the curvature of a short-dated
+smile, and the sufficient butterfly condition it is held to is tight when total variance
+is small, which flattens the one-week skew further; how much of the gap each explains is
+not separated here.
 
 ![Market bid-ask against the free SVI and eSSVI fits at one week, one month and six months](docs/smile.png)
 
 The chart shows where eSSVI pays for being arbitrage-free: at one week and one month it
-sits up to 13 vol points under the deep out-of-the-money puts, the strikes a crash hedge
+sits up to 14 vol points under the deep out-of-the-money puts, the strikes a crash hedge
 is bought at. An average error of two points hides that; the picture does not. The free
 SVI follows those puts, then turns sharply upward in the call wing it has no quotes for.
 
@@ -60,6 +65,9 @@ windows. P&L per unit of vega notional, `(K² − RV) / 2K`, in vol points.
 | Annualised Sharpe | 1.19 |
 | Skewness | −6.17 |
 
+These numbers are for windows starting on the first day of the sample. The median
+across the 21 possible starting days is a Sharpe of 1.06 and a worst window of −120.
+
 The premium is real and it is not free money: the seller wins five windows in six, and
 the worst window takes back almost three years of average gains. The choice of sampling
 day is not innocent either: across the 21 possible phases the mean P&L only moves from
@@ -72,7 +80,8 @@ Regressed in variance, realized on VIX squared gives a slope of **1.01** (White 
 error 0.17) and an intercept of **−0.011** (0.006), R² 0.40. The data cannot reject a
 slope of one: VIX squared moves one for one with the variance that follows, shifted up by
 a roughly constant premium, rather than over-reacting when volatility is high. The wide
-standard error is the honest part of that sentence.
+standard error is the honest part of that sentence, and the intercept is itself only
+borderline significant (t ≈ −2).
 
 Full report with term structure, parity forwards, the quote ledger and regimes:
 [`reports/options.html`](reports/options.html).
@@ -91,7 +100,7 @@ Full report with term structure, parity forwards, the quote ledger and regimes:
 - **SVI per slice.** Raw SVI in volatility space, residuals scaled by the half spread.
   Started from the quasi-explicit grid of Zeliade (2009): for fixed `(m, σ)` the other
   three parameters solve a linear least squares, so a 2-D grid replaces a blind 5-D
-  multi-start. That took the full fit from about four minutes to ten seconds.
+  multi-start.
 - **SVI + penalties.** The same fit with Durrleman and calendar penalties on the whole
   moneyness grid, tightened by continuation and started from the previous slice lifted to
   the current at-the-money variance. It is the baseline that open-source calibrators use,
@@ -101,9 +110,10 @@ Full report with term structure, parity forwards, the quote ledger and regimes:
 - **eSSVI.** One SSVI slice per expiry, fitted in maturity order in wing-slope
   coordinates `a = ψ(1+ρ)`, `b = ψ(1−ρ)`. Butterfly: `max(a, b) < 4` and
   `(a+b)·max(a, b) ≤ 8θ`. Calendar: `θ`, `a` and `b` non-decreasing. Linear interpolation in
-  time preserves both, so the surface is clean between pillars too; checked on a
-  400-maturity grid.
-- **The VIX, rebuilt.** The CBOE white-paper recipe on the raw quotes, with `e^{RT}` taken
+  time preserves both, so the surface is clean between pillars too; the pipeline checks
+  it on 400 interpolated maturities and the report prints the count (zero).
+- **The VIX, rebuilt.** The CBOE white-paper recipe on the chain's quotes (stale ones dropped, zero bids kept for the
+  recipe's truncation rule), with `e^{RT}` taken
   from the parity discount factor, and the continuous log-contract replication on each
   model's 30-day slice.
 - **The premium.** Non-overlapping 21-day windows with sensitivity across all 21
@@ -133,11 +143,10 @@ Stated because they matter more than the headline numbers.
 - **Delayed, and in places stale, quotes.** Yahoo serves 15-minute delayed quotes and
   leaves a contract's bid and ask as they stood at its last trade. Without the 30-day
   last-trade filter the chain shows 367 executable vertical and 594 butterfly arbitrages;
-  with it, 0 and 15. The cutoff is a judgment call: the count is flat for any cutoff from 3
-  to 30 days and jumps after 45, which is the evidence for the choice, not a proof.
+  with it, 0 and 15. The 30-day cutoff is a judgment call, not an estimate.
 - **Short-dated rates are noise.** At one week a 0.1% error on the discount factor is a
-  five-point error on the implied rate. The parity rate is 4–5% from three weeks out and up
-  to 20% at seven days. It barely moves the undiscounted premium, which is what the
+  five-point error on the implied rate. The parity rate is 3.9–5.6% from three weeks out
+  and up to 20% at seven days. It barely moves the undiscounted premium, which is what the
   volatility is read from, but the rate column should not be read as a funding curve.
 - **The VIX check is not instantaneous.** The index is live and the quotes are delayed,
   so 15.31 against 15.57 mixes recipe error with fifteen minutes of market.
