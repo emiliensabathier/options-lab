@@ -1,0 +1,24 @@
+{
+  "captured_from_utc": "2026-10-05T16:09:42.628726+00:00",
+  "captured_to_utc": "2026-10-05T16:10:10.852898+00:00",
+  "source": "Yahoo Finance via yfinance, 15-minute delayed quotes",
+  "levels": [
+    {
+      "symbol": "^SPX",
+      "last": 7761.75
+    },
+    {
+      "symbol": "^VIX",
+      "last": 15.569999694824219
+    },
+    {
+      "symbol": "^VIX9D",
+      "last": 13.029999732971191
+    },
+    {
+      "symbol": "^VIX3M",
+      "last": 18.059999465942383
+    }
+  ],
+  "rows": 17661
+}

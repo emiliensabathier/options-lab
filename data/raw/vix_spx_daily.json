@@ -1,0 +1,15 @@
+{
+  "fetched_at_utc": "2026-10-05T16:23:19.584033+00:00",
+  "source": "Yahoo Finance via yfinance, daily closes, unadjusted",
+  "symbols": {
+    "vix": "^VIX",
+    "spx": "^GSPC"
+  },
+  "first": "1990-01-02",
+  "last": "2026-10-05",
+  "rows": 9259,
+  "missing": {
+    "vix": 0,
+    "spx": 2
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "surface": {
+    "cboe_vix": 15.308563190152965,
+    "forwards": {
+      "2026-10-12": 7765.275330044751,
+      "2026-11-03": 7783.201943198417,
+      "2026-11-04": 7783.800416091119,
+      "2026-11-06": 7787.392156905886,
+      "2026-12-18": 7814.609901407025,
+      "2027-03-19": 7894.105404156743
+    },
+    "discounts": {
+      "2026-10-12": 0.9961041642688404,
+      "2026-11-03": 0.9968945194989903,
+      "2026-11-04": 0.9967331579545557,
+      "2026-11-06": 0.9961416578391579,
+      "2026-12-18": 0.991240123005551,
+      "2027-03-19": 0.9792491935483886
+    },
+    "refused": {
+      "no_bid": 43,
+      "stale_last_trade": 75,
+      "spread_too_wide": 37,
+      "in_the_money_side": 469,
+      "beyond_moneyness_range": 36
+    },
+    "chain_arbitrage": {
+      "Screened, any quote age": {
+        "vertical": 23,
+        "butterfly": 53,
+        "checked_expiries": 6
+      },
+      "Screened, last trade within 30 days": {
+        "vertical": 0,
+        "butterfly": 7,
+        "checked_expiries": 6
+      },
+      "Out-of-the-money side only": {
+        "vertical": 0,
+        "butterfly": 0,
+        "checked_expiries": 6
+      }
+    },
+    "models": {
+      "SVI per slice": {
+        "name": "SVI per slice",
+        "errors": {
+          "rmse_vol_points": 0.13685410492811242,
+          "max_abs_vol_points": 1.3011057879295462,
+          "share_inside_spread": 0.3897316219369895,
+          "quotes": 857
+        },
+        "violations": {
+          "butterfly_quoted": 0,
+          "butterfly_extrapolated": 1298,
+          "calendar_quoted": 2,
+          "calendar_extrapolated": 833
+        },
+        "replicated_vix": 16.029561063545863
+      },
+      "SVI + penalties": {
+        "name": "SVI + penalties",
+        "errors": {
+          "rmse_vol_points": 0.15445330629221468,
+          "max_abs_vol_points": 1.447284648536773,
+          "share_inside_spread": 0.2975495915985998,
+          "quotes": 857
+        },
+        "violations": {
+          "butterfly_quoted": 0,
+          "butterfly_extrapolated": 99,
+          "calendar_quoted": 0,
+          "calendar_extrapolated": 0
+        },
+        "replicated_vix": 15.286711258388197
+      },
+      "SSVI": {
+        "name": "SSVI",
+        "errors": {
+          "rmse_vol_points": 2.2173505558314397,
+          "max_abs_vol_points": 14.666928520976757,
+          "share_inside_spread": 0.024504084014002333,
+          "quotes": 857
+        },
+        "violations": {
+          "butterfly_quoted": 0,
+          "butterfly_extrapolated": 0,
+          "calendar_quoted": 0,
+          "calendar_extrapolated": 0
+        },
+        "replicated_vix": 15.097809978321711
+      },
+      "eSSVI": {
+        "name": "eSSVI",
+        "errors": {
+          "rmse_vol_points": 2.066304488408868,
+          "max_abs_vol_points": 13.958448920889992,
+          "share_inside_spread": 0.01750291715285881,
+          "quotes": 857
+        },
+        "violations": {
+          "butterfly_quoted": 0,
+          "butterfly_extrapolated": 0,
+          "calendar_quoted": 0,
+          "calendar_extrapolated": 0
+        },
+        "replicated_vix": 14.992943185855134
+      }
+    }
+  },
+  "premium": {
+    "headline": {
+      "windows": 440,
+      "mean_implied_vol": 0.19352295454545457,
+      "mean_realized_vol": 0.15340401426870917,
+      "share_implied_above_realized": 0.8431818181818181,
+      "mean_seller_pnl": 2.724037286447502,
+      "median_seller_pnl": 3.9085130334651037,
+      "worst_seller_pnl": -88.89352378632195,
+      "mean_capped_seller_pnl": 2.7403502868734066,
+      "annualised_sharpe": 1.1897895659318791,
+      "skewness": -6.167822115057772
+    },
+    "regression": {
+      "alpha": -0.010841137797966078,
+      "beta": 1.008109261192661,
+      "alpha_se": 0.005471831472405881,
+      "beta_se": 0.17224766587087745,
+      "r_squared": 0.3995175680002271,
+      "observations": 440
+    }
+  }
+}
