@@ -49,3 +49,36 @@ def test_too_few_pairs_is_a_named_refusal():
 def test_implausible_discount_is_a_named_refusal():
     chain = black_chain(discount=0.5)
     assert implied_forward(chain, spot=100.0) == (None, "discount_out_of_range")
+
+
+FORWARD, DISCOUNT = 100.0, 0.95
+SPOT = FORWARD * DISCOUNT  # no dividend
+
+
+def american_chain():
+    """In-the-money puts floored at exercise value, as an American chain quotes them."""
+    chain = black_chain(forward=FORWARD, discount=DISCOUNT, vol=0.08)
+    itm_put = (chain["kind"] == "P") & (chain["strike"] > SPOT)
+    floor = chain.loc[itm_put, "strike"] - SPOT
+    chain.loc[itm_put, "bid"] = np.maximum(chain.loc[itm_put, "bid"], floor)
+    chain.loc[itm_put, "ask"] = np.maximum(chain.loc[itm_put, "ask"], floor + 0.02)
+    return chain
+
+
+def test_early_exercise_bends_the_parity_line_when_the_discount_is_read_off_it():
+    fwd, reason = implied_forward(american_chain(), spot=SPOT)
+    assert reason == "discount_out_of_range" or abs(fwd.discount - DISCOUNT) > 1e-3
+
+
+def test_a_given_rate_pins_the_discount_and_reads_the_forward_below_spot():
+    rate = -np.log(DISCOUNT) / 0.25
+    fwd, reason = implied_forward(american_chain(), spot=SPOT, rate=rate)
+    assert reason is None
+    assert fwd.discount == pytest.approx(DISCOUNT)
+    # a cent: far puts priced under the half-spread have their bid floored at zero
+    assert fwd.forward == pytest.approx(FORWARD, abs=0.01)
+
+
+def test_a_given_rate_still_needs_pairs_below_spot():
+    chain = black_chain(strikes=[100.0, 101.0, 102.0, 103.0, 104.0, 105.0])
+    assert implied_forward(chain, spot=100.0, rate=0.04) == (None, "too_few_parity_pairs")

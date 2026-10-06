@@ -109,7 +109,7 @@ def surface_from_snapshot(snapshot: Snapshot, require_recipe: bool = True) -> Su
     A panel passes ``require_recipe=False``: one session whose listed strikes defeat the
     CBOE recipe still has four fits worth keeping.
     """
-    quotes = build_quotes(snapshot.quotes, snapshot.spot, snapshot.as_of)
+    quotes = build_quotes(snapshot.quotes, snapshot.spot, snapshot.as_of, snapshot.rate)
     table = quotes.table
 
     svi = fit_svi_surface(table, constrained=False)

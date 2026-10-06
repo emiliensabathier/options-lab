@@ -32,6 +32,7 @@ class Snapshot:
     as_of: pd.Timestamp
     spot: float
     levels: dict[str, float]
+    rate: float | None = None  # short rate pinning the discount, for American chains
 
 
 def parse_symbols(quotes: pd.DataFrame) -> pd.DataFrame:

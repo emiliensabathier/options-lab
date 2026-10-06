@@ -5,8 +5,9 @@ filter on ``date``, never the whole table. Three conventions differ from an SPX 
 
 - SPY options are American and settle into shares at the 16:00 close of expiry day. Only
   the out-of-the-money side enters the fits, where early exercise is worth little, and
-  maturities stop at one year, beyond which the parity forward near the money would carry
-  the early-exercise premium of the in-the-money leg. Dividends sit inside that forward.
+  maturities stop at one year. Parity cannot give the discount (an in-the-money put sits
+  on its exercise value), so it is pinned to the three-month Treasury bill and the forward
+  is read below spot; dividends sit inside that forward.
 - A side with no quote is a zero. A zero bid stays (the screen refuses it as ``no_bid`` and
   the CBOE recipe's truncation rule reads it); a zero ask leaves no price, and the row goes.
 - There is no last-trade date, so the thirty-day staleness rule cannot be applied: every
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
@@ -32,6 +34,17 @@ CLOSE = "16:00"
 KINDS = {"call": "C", "put": "P"}
 COLUMNS = ["contract_id", "expiration", "strike", "type", "bid", "ask"]
 MAX_MATURITY = 1.0
+BILL_DAYS = 91.0  # FRED DTB3: three-month bill, discount basis, percent
+
+
+def bill_rate(bills: pd.Series, day: str) -> float:
+    """Continuously compounded rate from the latest DTB3 print on or before ``day``."""
+    known = bills.dropna()
+    known = known.loc[known.index <= day]
+    if known.empty:
+        raise DataError(f"{day}: no three-month bill rate on or before it")
+    discount = 1.0 - float(known.iloc[-1]) / 100.0 * BILL_DAYS / 360.0
+    return float(-np.log(discount) * 365.0 / BILL_DAYS)
 
 
 def session_close(underlying: Path, day: str) -> float:
@@ -43,7 +56,7 @@ def session_close(underlying: Path, day: str) -> float:
 
 
 def load_spy_day(options: Path, underlying: Path, day: str,
-                 vix_close: float | None = None) -> Snapshot:
+                 vix_close: float | None = None, rate: float | None = None) -> Snapshot:
     """One session of the archive, reduced to the columns and conventions the pipeline reads."""
     raw = pq.read_table(options, columns=COLUMNS,
                         filters=[("date", "==", pd.Timestamp(day))]).to_pandas()
@@ -66,4 +79,4 @@ def load_spy_day(options: Path, underlying: Path, day: str,
     quotes = quotes.assign(T=year_fractions(quotes, as_of))
     quotes = quotes.loc[quotes["T"] <= MAX_MATURITY].reset_index(drop=True)
     levels = {"SPY": spot} | ({} if vix_close is None else {"^VIX": float(vix_close)})
-    return Snapshot(quotes=quotes, as_of=as_of, spot=spot, levels=levels)
+    return Snapshot(quotes=quotes, as_of=as_of, spot=spot, levels=levels, rate=rate)

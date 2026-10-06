@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from conftest import AS_OF, black_chain
+from olab.errors import DataError
 from olab.surface.quotes import build_quotes, is_stale, screen_quotes
 
 
@@ -52,3 +53,14 @@ def test_far_strikes_are_refused_beyond_the_moneyness_range():
     sq = build_quotes(chain, spot=100.0, as_of=AS_OF)
     assert sq.refused["beyond_moneyness_range"] == 1
     assert sq.table["strike"].min() == pytest.approx(95.0)
+
+
+def test_a_chain_with_nothing_left_after_screening_is_a_data_error():
+    week = black_chain(maturity=3 / 365, expiry="2026-10-08")
+    with pytest.raises(DataError, match="no quote"):
+        build_quotes(week, spot=100.0, as_of=AS_OF)
+
+
+def test_a_given_rate_reaches_every_expiry():
+    sq = build_quotes(black_chain(discount=0.99), spot=100.0, as_of=AS_OF, rate=0.02)
+    assert sq.forwards["2027-01-04"].discount == pytest.approx(np.exp(-0.02 * 0.25))

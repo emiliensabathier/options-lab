@@ -1,8 +1,9 @@
+import numpy as np
 import pandas as pd
 import pytest
 
 from olab.errors import DataError
-from olab.spy import load_spy_day
+from olab.spy import bill_rate, load_spy_day
 
 DAY = "2022-10-14"
 
@@ -71,3 +72,16 @@ def test_every_quote_counts_as_fresh_since_the_archive_has_no_last_trade(archive
 def test_refuses_a_session_absent_from_the_archive(archive):
     with pytest.raises(DataError, match="2022-10-12"):
         load_spy_day(*archive, "2022-10-12")
+
+
+def test_a_given_rate_rides_on_the_snapshot(archive):
+    assert load_spy_day(*archive, DAY).rate is None
+    assert load_spy_day(*archive, DAY, rate=0.03).rate == pytest.approx(0.03)
+
+
+def test_bill_rate_converts_the_discount_yield_and_carries_over_holidays():
+    bills = pd.Series([4.0, None], index=["2022-10-13", "2022-10-14"])
+    expected = -np.log(1.0 - 0.04 * 91.0 / 360.0) * 365.0 / 91.0
+    assert bill_rate(bills, DAY) == pytest.approx(expected)
+    with pytest.raises(DataError, match="2022-10-12"):
+        bill_rate(bills, "2022-10-12")

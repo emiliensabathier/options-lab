@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from olab.black import implied_vol
+from olab.errors import DataError
 from olab.surface.forwards import Forward, implied_forward
 
 MIN_MATURITY = 7.0 / 365.0  # inside a week the smile is dominated by event and gamma noise
@@ -95,8 +96,13 @@ def _vol_row(row, fwd: Forward, refused: Counter) -> dict | None:
     }
 
 
-def build_quotes(quotes: pd.DataFrame, spot: float, as_of: pd.Timestamp) -> SurfaceQuotes:
-    """Screen, imply forwards, keep the out-of-the-money side, invert to volatilities."""
+def build_quotes(
+    quotes: pd.DataFrame, spot: float, as_of: pd.Timestamp, rate: float | None = None
+) -> SurfaceQuotes:
+    """Screen, imply forwards, keep the out-of-the-money side, invert to volatilities.
+
+    ``rate`` pins every expiry's discount, for American chains (see ``implied_forward``).
+    """
     short = quotes["T"] < MIN_MATURITY
     refused: Counter = Counter({"maturity_under_7_days": int(short.sum())})
     screened, screen_refusals = screen_quotes(quotes.loc[~short], as_of)
@@ -105,7 +111,7 @@ def build_quotes(quotes: pd.DataFrame, spot: float, as_of: pd.Timestamp) -> Surf
     rows: list[dict] = []
     forwards: dict[str, Forward] = {}
     for expiry, group in screened.groupby("expiry", sort=True):
-        fwd, reason = implied_forward(group, spot)
+        fwd, reason = implied_forward(group, spot, rate)
         if fwd is None:
             refused[f"expiry_{reason}"] += len(group)
             continue
@@ -120,5 +126,7 @@ def build_quotes(quotes: pd.DataFrame, spot: float, as_of: pd.Timestamp) -> Surf
             if vol is not None:
                 rows.append(vol)
 
+    if not rows:
+        raise DataError(f"no quote survived screening; refusals: {dict(+refused)}")
     table = pd.DataFrame(rows).sort_values(["T", "strike"]).reset_index(drop=True)
     return SurfaceQuotes(table=table, forwards=forwards, screened=screened, refused=+refused)

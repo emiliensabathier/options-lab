@@ -4,8 +4,8 @@ Two sources, each fetched into ``cache/`` by its own script and never committed:
 
 - ``hd``: HistoricalData.net's SPX/SPXW closes, July to December 2022
   (``scripts/fetch_eod_sample.py``).
-- ``spy``: the SPY closes lambdaclass redistributes, 2008 to 2025
-  (``scripts/fetch_spy_archive.py``).
+- ``spy``: the SPY closes lambdaclass redistributes, 2008 to 2025, with the three-month
+  bill that pins their discount (``scripts/fetch_spy_archive.py``).
 
 Either is sampled at the first session of each day, week, month or quarter. A coarse pass
 then a finer one resumes into the same file, so a quarterly panel exists early.
@@ -30,7 +30,7 @@ from olab.eod import load_eod_day
 from olab.errors import CalibrationError, DataError
 from olab.panel import sample_sessions, surface_rows
 from olab.pipeline import surface_from_snapshot
-from olab.spy import load_spy_day
+from olab.spy import bill_rate, load_spy_day
 
 ROOT = Path(__file__).resolve().parents[1]
 VIX = ROOT / "data" / "raw" / "vix_spx_daily.csv"
@@ -52,12 +52,19 @@ def hd_sessions(args) -> dict[str, object]:
 
 def spy_sessions(args) -> dict[str, object]:
     options, underlying = SPY_CACHE / "SPY_options.parquet", SPY_CACHE / "SPY_underlying.parquet"
-    if not options.exists():
-        raise SystemExit(f"no {options}; run scripts/fetch_spy_archive.py")
+    bills_path = SPY_CACHE / "DTB3.csv"
+    if not (options.exists() and bills_path.exists()):
+        raise SystemExit(f"no archive or bills in {SPY_CACHE}; run scripts/fetch_spy_archive.py")
+    bills = pd.read_csv(bills_path, index_col=0, na_values=".").iloc[:, 0]
+    bills = bills.set_axis(pd.to_datetime(bills.index).strftime("%Y-%m-%d"))
     dates = pq.read_table(underlying, columns=["date"]).column("date").to_pylist()
     days = sample_sessions(dates, args.period, args.first, args.last)
     return {
-        day: (lambda vix, day=day: load_spy_day(options, underlying, day, vix_close=vix))
+        day: (
+            lambda vix, day=day: load_spy_day(
+                options, underlying, day, vix_close=vix, rate=bill_rate(bills, day)
+            )
+        )
         for day in days
     }
 
