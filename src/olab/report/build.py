@@ -14,7 +14,10 @@ from olab.surface.arbitrage import K_GRID
 from olab.surface.quotes import MAX_QUOTE_AGE_DAYS
 
 TITLE = "SPX volatility surface and variance risk premium"
-PANEL_SOURCE = "https://historicaldata.net/options.html"
+PANEL_SOURCES = {
+    "hd": "https://historicaldata.net/options.html",
+    "spy": "https://github.com/lambdaclass/options_backtester",
+}
 
 STYLE = """
 body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 auto;
@@ -231,7 +234,63 @@ def _premium_section(premium: PremiumOutput) -> list[str]:
     ]
 
 
-def _panel_section(panel: dict) -> list[str]:
+def _hd_intro(panel: dict) -> tuple[str, str]:
+    low, high = panel["published_vix_range"]
+    return (
+        f"The same comparison on {panel['sessions']} sessions of 2022",
+        f"End-of-day SPX and SPXW chains from {panel['first']} to {panel['last']}, run "
+        "through the same screen, fits and audits as the capture above; a median "
+        f"session kept {panel['quotes_median']:,.0f} quotes over "
+        f"{panel['expiries_median']:.0f} expiries. The published VIX ranged from "
+        f"{low:.1f} to {high:.1f}: a bear market, not a calm one. Data: "
+        f'<a href="{PANEL_SOURCES["hd"]}">HistoricalData.net</a> free 2022H2 sample; its '
+        "licence allows these aggregates and not the quotes, which are not "
+        "redistributed here.",
+    )
+
+
+def _spy_intro(panel: dict) -> tuple[str, str]:
+    low, high = panel["published_vix_range"]
+    return (
+        f"The same comparison on {panel['sessions']} SPY closes, "
+        f"{panel['first'][:4]}–{panel['last'][:4]}",
+        f"The first session of each month from {panel['first']} to {panel['last']}, SPY "
+        "options rather than SPX: American exercise, so only out-of-the-money quotes and "
+        "maturities up to one year; dividends sit inside the parity forward; no last-trade "
+        "date, so the 30-day staleness rule is not applied. A median session kept "
+        f"{panel['quotes_median']:,.0f} quotes over {panel['expiries_median']:.0f} expiries; "
+        f"the published VIX ranged from {low:.1f} to {high:.1f}. SPY is about a tenth of "
+        "SPX, so its 30-day variance compares with the VIX, but the CBOE recipe on SPY is an "
+        "approximation of the index. Data: the SPY archive redistributed by "
+        f'<a href="{PANEL_SOURCES["spy"]}">lambdaclass/options_backtester</a> "for research '
+        'and educational reproducibility", taken from philippdubach/options-data (no longer '
+        "online, upstream undocumented); not redistributed here.",
+    )
+
+
+PANEL_INTROS = {"hd": _hd_intro, "spy": _spy_intro}
+
+
+def _breakdown_table(label: str, table) -> str:
+    rows = [
+        [
+            str(group),
+            str(int(r["sessions"])),
+            _pct(r["ranking_share"]),
+            *(_num(r[name]) for name in table.columns[2:6]),
+            f"{r['quoted_SVI per slice']:,.0f} / {r['quoted_SVI + penalties']:,.0f}",
+            f"{r['recipe_gap']:+.2f}",
+        ]
+        for group, r in table.iterrows()
+    ]
+    return _table(
+        [label, "Sessions", "Ranking holds", *(f"RMSE {n}" for n in table.columns[2:6]),
+         "Quoted arbitrage, SVI / SVI + penalties (median)", "CBOE recipe − VIX, median"],
+        rows,
+    )
+
+
+def _panel_section(source: str, panel: dict) -> list[str]:
     rows = [
         [
             name,
@@ -244,19 +303,11 @@ def _panel_section(panel: dict) -> list[str]:
         ]
         for name, m in panel["models"].iterrows()
     ]
-    low, high = panel["published_vix_range"]
+    title, intro = PANEL_INTROS[source](panel)
+    years = panel["years"]
     return [
-        f"<h2>The same comparison on {panel['sessions']} sessions of 2022</h2>",
-        _note(
-            f"End-of-day SPX and SPXW chains from {panel['first']} to {panel['last']}, run "
-            "through the same screen, fits and audits as the capture above; a median "
-            f"session kept {panel['quotes_median']:,.0f} quotes over "
-            f"{panel['expiries_median']:.0f} expiries. The published VIX ranged from "
-            f"{low:.1f} to {high:.1f}: a bear market, not a calm one. Data: "
-            f'<a href="{PANEL_SOURCE}">HistoricalData.net</a> free 2022H2 sample; its '
-            "licence allows these aggregates and not the quotes, which are not "
-            "redistributed here."
-        ),
+        f"<h2>{title}</h2>",
+        _note(intro),
         _table(
             ["Model", "RMSE median (10–90%)", "Inside bid-ask, median",
              "Sessions with quoted butterfly", "Sessions with quoted calendar",
@@ -271,15 +322,17 @@ def _panel_section(panel: dict) -> list[str]:
             "10th to 90th percentile); the index settles at 16:15 and the quotes are the "
             "ones standing at the close."
         ),
+        _breakdown_table("VIX regime", panel["regimes"]),
+        *([] if len(years) < 2 else [_breakdown_table("Year", years)]),
     ]
 
 
 def build_report(
-    surface: SurfaceOutput, premium: PremiumOutput, panel: dict | None = None
+    surface: SurfaceOutput, premium: PremiumOutput, panels: dict[str, dict] | None = None
 ) -> str:
     """Render the whole report as one self-contained HTML document.
 
-    ``panel`` is ``olab.panel.panel_summary`` of the multi-session run, when there is one.
+    ``panels`` maps a source (``hd``, ``spy``) to ``olab.panel.panel_summary`` of its run.
     """
     snapshot = surface.snapshot
     sections = [
@@ -294,7 +347,8 @@ def build_report(
         term_chart(surface.quotes.table, surface.surfaces["SVI per slice"], snapshot.levels),
         *_forwards_section(surface),
         *_chain_section(surface),
-        *([] if panel is None else _panel_section(panel)),
+        *(line for source, panel in (panels or {}).items()
+          for line in _panel_section(source, panel)),
         *_premium_section(premium),
     ]
     body = "\n".join(sections)

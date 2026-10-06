@@ -17,7 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 capture = ["yfinance>=0.2.40"]
-dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5"]
+archive = ["pyarrow>=15"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5", "pyarrow>=15"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

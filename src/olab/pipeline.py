@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from olab.errors import CalibrationError, DataError
 from olab.premium.history import (
     Regression,
     by_vix_regime,
@@ -53,7 +54,7 @@ class SurfaceOutput:
     models: dict[str, ModelResult]
     between_pillars: dict[str, dict[str, int]]
     surfaces: dict[str, object]
-    cboe: dict
+    cboe: dict | None
 
 
 @dataclass(frozen=True)
@@ -90,8 +91,24 @@ def run_surface(chain_csv: Path, meta_json: Path) -> SurfaceOutput:
     return surface_from_snapshot(load_snapshot(chain_csv, meta_json))
 
 
-def surface_from_snapshot(snapshot: Snapshot) -> SurfaceOutput:
-    """The surface half of the study on any snapshot, a Yahoo capture or an archived close."""
+def recipe(snapshot: Snapshot, discounts: dict[str, float], required: bool) -> dict | None:
+    """The CBOE recipe on the non-stale quotes; ``None`` where it fails and is not required."""
+    try:
+        # zero bids stay in: the recipe's truncation rule reads them
+        return cboe_vix(snapshot.quotes.loc[~is_stale(snapshot.quotes, snapshot.as_of)],
+                        discounts)
+    except (CalibrationError, DataError):
+        if required:
+            raise
+        return None
+
+
+def surface_from_snapshot(snapshot: Snapshot, require_recipe: bool = True) -> SurfaceOutput:
+    """The surface half of the study on any snapshot, a Yahoo capture or an archived close.
+
+    A panel passes ``require_recipe=False``: one session whose listed strikes defeat the
+    CBOE recipe still has four fits worth keeping.
+    """
     quotes = build_quotes(snapshot.quotes, snapshot.spot, snapshot.as_of)
     table = quotes.table
 
@@ -117,8 +134,7 @@ def surface_from_snapshot(snapshot: Snapshot) -> SurfaceOutput:
         models=models,
         between_pillars={name: between_pillars(surfaces[name], dense) for name in ARBITRAGE_FREE},
         surfaces=surfaces,
-        # zero bids stay in: the recipe's truncation rule reads them
-        cboe=cboe_vix(snapshot.quotes.loc[~is_stale(snapshot.quotes, snapshot.as_of)], discounts),
+        cboe=recipe(snapshot, discounts, required=require_recipe),
     )
 
 

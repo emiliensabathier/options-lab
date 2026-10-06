@@ -18,9 +18,9 @@ import pandas as pd
 from olab.errors import DataError
 
 NEW_YORK = "America/New_York"
-SETTLEMENT_TIME = {"SPXW": "16:00", "SPX": "09:30"}
+SETTLEMENT_TIME = {"SPXW": "16:00", "SPX": "09:30", "SPY": "16:00"}
 SECONDS_PER_YEAR = 365.0 * 24 * 3600
-SYMBOL = r"^(?P<root>SPXW?)(?P<yymmdd>\d{6})(?P<kind>[CP])(?P<strike>\d{8})$"
+SYMBOL = r"^(?P<root>SPXW?|SPY)(?P<yymmdd>\d{6})(?P<kind>[CP])(?P<strike>\d{8})$"
 REQUIRED = ("contractSymbol", "strike", "bid", "ask", "expiry", "kind")
 
 
