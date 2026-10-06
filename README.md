@@ -35,9 +35,9 @@ gives the 30-day vol furthest from the CBOE recipe on the same chain (16.03 agai
 15.31). Adding penalties, the approach taken by the open-source SVI calibrators this
 project started from, removes most of the wing arbitrage but moves calendar violations
 inside the quoted range. SSVI is arbitrage-free by theorem. eSSVI is
-butterfly-free by construction and calendar-clean on this chain, but its calendar
-constraints are necessary only, and on the historical panels below it crosses on about
-a quarter to half of the sessions. Both cost about two vol points of fit: eSSVI misses
+butterfly-free by construction and, since its fit imposes the sufficient calendar
+condition of Hendriks and Martini (2019), calendar-free too: no crossing on this chain or
+on any of the 238 archived sessions below. Both cost about two vol points of fit: eSSVI misses
 by 2 to 4 points out to one month, about one point at three to six months and under half a
 point at one year. Every constrained model, penalised SVI included, misses its worst quote
 by about 20 points. One SSVI shape per expiry cannot follow the curvature of a short-dated
@@ -59,58 +59,71 @@ of end-of-day chains (sources and terms under [Data sources](#data-sources)); pe
 aggregates are in `data/panel/`, the quotes themselves are not redistributed.
 
 **SPX/SPXW, 2022H2, weekly** ([HistoricalData.net](https://historicaldata.net/options.html)
-free sample): 33 sessions from 2022-07-01 to 2022-12-27, a bear market with the VIX between
-20 and 32, a median 5,415 quotes over 37 expiries per session.
+free sample): the first session of each week from 2022-07-01 to 2022-12-27, 25 usable
+sessions (2022-09-19 and 2022-12-05 carry two index closes and are skipped), a bear market
+with the VIX between 20 and 32, a median 5,455 quotes over 39 expiries per session.
 
 | Model | RMSE median (10–90%) | Inside bid-ask | Sessions with quoted butterfly | Sessions with quoted calendar | Wing violations, median | 30-day vol − VIX, median |
 | --- | --- | --- | --- | --- | --- | --- |
-| SVI per slice | 0.42 (0.27–0.54) | 21.6% | 5 / 33 | 32 / 33 | 7,629 | +0.36 |
-| SVI + penalties | 1.13 (0.41–5.66) | 17.3% | 15 / 33 | 29 / 33 | 2,618 | +8.31 |
-| eSSVI | 1.25 (1.09–1.51) | 12.5% | 0 / 33 | 15 / 33 | 70 | −0.36 |
-| SSVI | 1.43 (1.24–1.78) | 8.6% | 0 / 33 | 0 / 33 | 0 | −0.35 |
+| SVI per slice | 0.40 (0.24–0.52) | 23.6% | 5 / 25 | 24 / 25 | 6,916 | +0.07 |
+| SVI + penalties | 1.04 (0.40–4.58) | 21.0% | 8 / 25 | 21 / 25 | 2,440 | +1.15 |
+| eSSVI | 1.34 (1.18–1.74) | 12.2% | 0 / 25 | 0 / 25 | 0 | −0.44 |
+| SSVI | 1.46 (1.31–1.81) | 8.2% | 0 / 25 | 0 / 25 | 0 | −0.38 |
 
 **SPY, 2008–2025** ([lambdaclass/options_backtester](https://github.com/lambdaclass/options_backtester)
-archive): 107 sessions from 2008-01-02 to 2025-10-01, monthly to 2012 and quarterly after
-(the monthly pass was stopped there; the script resumes it), VIX from 9 to 69. Before 2013
-the archive holds a median 587 quotes per session, after it 1,795. Medians over this panel
-lean on 2008–2012, which supplies 57 of the 107 sessions.
+archive): the first session of each month from 2008-01-02 to 2025-12-01, 213 sessions,
+VIX from 9 to 69. Before 2013 the archive holds a median 617 quotes per session, after it
+2,020.
 
 | Model | RMSE median (10–90%) | Inside bid-ask | Sessions with quoted butterfly | Sessions with quoted calendar | Wing violations, median | 30-day vol − VIX, median |
 | --- | --- | --- | --- | --- | --- | --- |
-| SVI per slice | 0.29 (0.15–5.31) | 78.6% | 25 / 107 | 54 / 107 | 4,353 | +11.42 |
-| SVI + penalties | 0.48 (0.22–1.07) | 42.6% | 7 / 107 | 41 / 107 | 871 | +12.29 |
-| eSSVI | 0.66 (0.34–1.97) | 55.2% | 0 / 107 | 21 / 107 | 0 | −0.29 |
-| SSVI | 0.85 (0.47–2.24) | 42.0% | 0 / 107 | 0 / 107 | 0 | −0.16 |
+| SVI per slice | 0.35 (0.17–6.45) | 51.2% | 79 / 213 | 155 / 213 | 7,208 | +12.91 |
+| SVI + penalties | 0.57 (0.24–1.46) | 26.6% | 24 / 213 | 118 / 213 | 1,622 | +35.43 |
+| eSSVI | 0.96 (0.37–2.13) | 28.1% | 0 / 213 | 0 / 213 | 0 | −0.19 |
+| SSVI | 1.12 (0.53–2.38) | 17.8% | 0 / 213 | 0 / 213 | 0 | −0.10 |
 
 By VIX regime (SPY; median RMSE in vol points):
 
 | VIX regime | Sessions | Ranking holds | SVI | SVI + pen. | eSSVI | SSVI | Recipe − VIX |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| below 15 | 19 | 53% | 0.29 | 0.52 | 1.01 | 1.26 | −0.24 |
-| 15 to 25 | 60 | 62% | 0.25 | 0.56 | 0.57 | 0.77 | −0.33 |
-| 25 and above | 28 | 68% | 0.35 | 0.38 | 0.57 | 0.85 | −0.62 |
+| below 15 | 63 | 43% | 2.71 | 0.52 | 0.96 | 1.12 | −0.18 |
+| 15 to 25 | 109 | 58% | 0.33 | 0.60 | 0.96 | 1.10 | −0.32 |
+| 25 and above | 41 | 66% | 0.43 | 0.55 | 1.02 | 1.20 | −0.59 |
 
 By year, the eSSVI and SSVI misses grow with the chains: about half a point in 2008–2011,
 when SPY listed a handful of monthly expiries, and two points by 2024–2025, close to the
 2026 SPX figure, once weekly and daily expiries put steep short-dated smiles in the fit.
+The free fit's 2.71 below a VIX of 15 comes from 2013 and 2015–2017, calm years in which
+its yearly median miss is 2.6 to 6.5 points against about 0.6 for penalised SVI.
 
 What carries over from the snapshot, and what does not:
 
 - **The order of fit is stable in pairs, not as a whole.** The full ranking (free SVI,
-  penalised SVI, eSSVI, SSVI) holds on 61% of HD sessions and 62% of SPY ones. eSSVI beats
-  SSVI on 100% and 97%; free SVI beats penalised SVI on 100% and 80%. The pair that
-  breaks most is penalised SVI against eSSVI (61% and 74%): the penalties sometimes cost
-  more fit than the eSSVI shape does.
-- **Only SSVI is clean everywhere.** It has no butterfly or calendar violation on any of
-  the 140 sessions. eSSVI never has a butterfly violation, but crosses in time on 19 of 33
-  HD sessions and 24 of 107 SPY ones (see [Limitations](#limitations)).
+  penalised SVI, eSSVI, SSVI) holds on 60% of HD sessions and 55% of SPY ones. eSSVI beats
+  SSVI on 84% and 96%; free SVI beats penalised SVI on 100% and 72%. Penalised SVI beats
+  eSSVI on only 72% and 77%: the penalties sometimes cost more fit than the eSSVI shape
+  does.
+- **Both SSVI fits are clean everywhere.** Neither has a butterfly or calendar violation
+  on any of the 238 sessions, inside the quoted range or in the wings. The free and
+  penalised SVI cross in time inside the quoted range on 24 and 21 of 25 HD sessions and on
+  155 and 118 of 213 SPY ones.
+- **The exact calendar condition costs eSSVI little, and not evenly.** On the sessions
+  both runs share (25 HD, 107 SPY), its median RMSE moves from 1.27 to 1.34 vol points on
+  HD and from 0.66 to 0.67 on SPY. Per session the median increase is 0.04 and 0.00
+  points; the worst are 0.51 (HD, 2022-10-10) and 1.09 (SPY, 2025-01-02). Sessions with a
+  calendar crossing go from 15 of 25 and 21 of 107 to none. On SPY only 27 of the 107
+  sessions move by more than 0.01 point; on HD 24 of 25 do, because the `ψ/θ` cap binds
+  on most 2022 SPX sessions even where the old fit did not cross. That cost is why eSSVI
+  now loses to SSVI on 4 of 25 HD sessions. The other three models are unchanged to the
+  last digit (see [Limitations](#limitations)).
 - **Free wings break the replication.** The free and penalised SVI 30-day variances sit
-  more than five points above the VIX on about half the SPY sessions and up to 369 points
-  above it on one HD session; the two SSVI fits stay within two points of the index on
-  every session. The snapshot's free fit, 16.03 against a VIX of 15.57, was the mild end
-- **The CBOE recipe sits a little under the index.** Median −0.26 points on SPX (10–90%:
-  −0.41 to +0.05) and −0.37 on SPY, which is not the index's underlying. It finds no
-  usable pair of expiries on 14 of 33 HD sessions and on every SPY session before 2013;
+  more than five points above the VIX on 50% and 61% of the SPY sessions and up to 369
+  points above it on one HD session; the two SSVI fits stay within three points of the
+  index on every session (two for eSSVI). The snapshot's free fit, 16.03 against a VIX of 15.57, was the mild end
+- **The CBOE recipe sits a little under the index.** Median −0.28 points on SPX (10–90%:
+  −0.42 to −0.01) and −0.32 on SPY, which is not the index's underlying. It finds no
+  usable pair of expiries on 12 of 25 HD sessions, on every SPY session before 2013 and on
+  14 after;
   those sessions are left out of the gap rather than filled.
 - **The two archives are one feed.** On the 127 sessions both cover (July to December
   2022), 1,086,488 SPY contracts match by symbol, every bid is identical, and so is every ask
@@ -177,7 +190,9 @@ Full report with term structure, parity forwards, the quote ledger and regimes:
   at-the-money variance per expiry, constrained to their sufficient no-arbitrage region.
 - **eSSVI.** One SSVI slice per expiry, fitted in maturity order in wing-slope
   coordinates `a = ψ(1+ρ)`, `b = ψ(1−ρ)`. Butterfly: `max(a, b) < 4` and
-  `(a+b)·max(a, b) ≤ 8θ`. Calendar: `θ`, `a` and `b` non-decreasing. Linear interpolation in
+  `(a+b)·max(a, b) ≤ 8θ`. Calendar: `θ`, `a` and `b` non-decreasing and `ψ/θ`
+  non-increasing, the sufficient condition of Hendriks and Martini (2019), Prop. 3.5, held
+  as a floor on `θ`. Linear interpolation of `θ`, `ψ` and `ψρ` in
   time preserves both, so the surface is clean between pillars too; the pipeline checks
   it on 400 interpolated maturities and the report prints the count (zero).
 - **The VIX, rebuilt.** The CBOE white-paper recipe on the chain's quotes (stale ones dropped, zero bids kept for the
@@ -258,21 +273,16 @@ Stated because they matter more than the headline numbers.
   volatility is read from, but the rate column should not be read as a funding curve.
 - **The VIX check is not instantaneous.** The index is live and the quotes are delayed,
   so 15.31 against 15.57 mixes recipe error with fifteen minutes of market.
-- **eSSVI's calendar condition is necessary, not sufficient.** Non-decreasing `θ`, `a`, `b`
-  is required, not enough: with `θ` and `a` flat and `b` rising, the at-the-money slope
-  `(a − b)/2` falls and the later slice dips below the earlier one just right of the money
-  (`tests/test_svi.py` holds the counterexample). The fitted parameters on the failing
-  sessions are monotone to machine precision, one root is kept per expiry (SPXW over SPX;
-  SPY has a single root and no duplicate contracts), and the gaps are far above the
-  1e-9 tolerance, so this is the model, not the fit, the audit or the data. It shows
-  between expiries one to three days apart where `θ` sits at its floor: on 2022-08-15 the
-  16-day slice is 7% below the 15-day one in total variance at k = 0.04. Counted over the
-  panels, eSSVI has calendar violations on **19 of 33** HD sessions (inside the quoted
-  range on 15, up to 922 grid points) and on **24 of 107** SPY sessions (quoted on 21, up
-  to 1,049), 1–5% of the grid between consecutive expiries on the sessions hit. Butterfly stays
-  at zero everywhere. On the 2026 capture the dense-grid check finds no crossing; that is a
-  property of that chain, not a guarantee. A sufficient condition (Hendriks and Martini
-  give one) would have to be imposed in the fit to close this.
+- **eSSVI's calendar condition is sufficient, not necessary, and is paid for in fit.**
+  Non-decreasing `θ`, `a`, `b` is necessary but not enough: with `θ` and `a` flat and `b`
+  rising, the later slice dips below the earlier one just right of the money
+  (`tests/test_svi.py` holds the counterexample). Before the fix this happened on 15 of 25
+  HD and 21 of 107 SPY sessions, on up to 922 and 1,049 quoted grid points. The fit now
+  also holds `ψ/θ` non-increasing, the first sufficient branch of Hendriks and Martini
+  (2019), Prop. 3.5. It is read through Mingone (2022, arXiv:2204.00312, §2.1), because the
+  original was not reachable; Corbetta et al. (2019) state only the necessary part. The
+  second branch, a quadratic inequality, is not used, so the fit gives up some
+  arbitrage-free surfaces; that is the RMSE cost reported above.
 - **Penalties do not guarantee freedom from arbitrage.** The penalised SVI keeps 596
   calendar violations inside the quoted range. That is a finding about the approach, and
   it is reported rather than tuned away.

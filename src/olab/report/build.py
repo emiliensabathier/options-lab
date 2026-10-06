@@ -238,7 +238,8 @@ def _hd_intro(panel: dict) -> tuple[str, str]:
     low, high = panel["published_vix_range"]
     return (
         f"The same comparison on {panel['sessions']} sessions of 2022",
-        f"End-of-day SPX and SPXW chains from {panel['first']} to {panel['last']}, run "
+        "End-of-day SPX and SPXW chains, the first session of each week from "
+        f"{panel['first']} to {panel['last']}, run "
         "through the same screen, fits and audits as the capture above; a median "
         f"session kept {panel['quotes_median']:,.0f} quotes over "
         f"{panel['expiries_median']:.0f} expiries. The published VIX ranged from "
@@ -254,7 +255,7 @@ def _spy_intro(panel: dict) -> tuple[str, str]:
     return (
         f"The same comparison on {panel['sessions']} SPY closes, "
         f"{panel['first'][:4]}–{panel['last'][:4]}",
-        f"Sessions sampled monthly, then quarterly, from {panel['first']} to {panel['last']}; SPY "
+        f"The first close of each month from {panel['first']} to {panel['last']}; SPY "
         "options rather than SPX: American exercise, so only out-of-the-money quotes and "
         "maturities up to one year; parity cannot give the discount, so it is pinned to the "
         "three-month Treasury bill (FRED DTB3) and the forward, dividends included, is read "
@@ -292,6 +293,20 @@ def _breakdown_table(label: str, table) -> str:
     )
 
 
+def _essvi_calendar_note(panel: dict) -> str:
+    crossed = int(panel["models"].loc["eSSVI", "sessions_with_quoted_calendar"])
+    condition = (
+        "its fit imposes the sufficient calendar condition of Hendriks and Martini (2019), "
+        "Prop. 3.5 (non-decreasing θ and wing slopes, non-increasing ψ/θ)."
+    )
+    if crossed == 0:
+        return f"eSSVI never crosses in time inside the quoted range: {condition}"
+    return (
+        f"eSSVI still crosses in time inside the quoted range on {crossed} of "
+        f"{panel['sessions']} sessions, although {condition}"
+    )
+
+
 def _panel_section(source: str, panel: dict) -> list[str]:
     rows = [
         [
@@ -325,10 +340,7 @@ def _panel_section(source: str, panel: dict) -> list[str]:
             f"{panel['recipe_gap_median']:+.2f} vol points from the published VIX at the "
             f"median ({panel['recipe_gap_low']:+.2f} to {panel['recipe_gap_high']:+.2f}, "
             "10th to 90th percentile); the index settles at 16:15 and the quotes are the "
-            "ones standing at the close. eSSVI crosses in time inside the quoted range on "
-            f"{int(panel['models'].loc['eSSVI', 'sessions_with_quoted_calendar'])} of "
-            f"{panel['sessions']} sessions: its calendar constraints (non-decreasing "
-            "θ and wing slopes) are necessary, not sufficient."
+            "ones standing at the close. " + _essvi_calendar_note(panel)
         ),
         _breakdown_table("VIX regime", panel["regimes"]),
         *([] if len(years) < 2 else [_breakdown_table("Year", years)]),

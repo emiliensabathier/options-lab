@@ -60,4 +60,16 @@ def test_panel_sections_render_per_source_with_attribution(surface_output, premi
     assert "The same comparison on 2 SPY closes, 2022–2022" in page
     assert 'href="https://github.com/lambdaclass/options_backtester"' in page
     assert page.count("VIX regime") == 2
-    assert "eSSVI crosses in time inside the quoted range on 2 of 2 sessions" in page
+    assert "eSSVI still crosses in time inside the quoted range on 2 of 2 sessions" in page
+
+
+def test_panel_note_states_a_calendar_clean_essvi_and_why(surface_output, premium_output):
+    from olab.panel import panel_summary
+    from test_panel import _panel
+
+    rows = _panel([(0.1, 0.5, 1.8, 2.0)])
+    rows.loc[rows["model"] == "eSSVI", "calendar_quoted"] = 0
+    page = build_report(surface_output, premium_output, {"hd": panel_summary(rows)})
+
+    assert "eSSVI never crosses in time inside the quoted range" in page
+    assert "Prop. 3.5" in page
