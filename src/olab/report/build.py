@@ -254,7 +254,7 @@ def _spy_intro(panel: dict) -> tuple[str, str]:
     return (
         f"The same comparison on {panel['sessions']} SPY closes, "
         f"{panel['first'][:4]}–{panel['last'][:4]}",
-        f"The first session of each month from {panel['first']} to {panel['last']}, SPY "
+        f"Sessions sampled monthly, then quarterly, from {panel['first']} to {panel['last']}; SPY "
         "options rather than SPX: American exercise, so only out-of-the-money quotes and "
         "maturities up to one year; parity cannot give the discount, so it is pinned to the "
         "three-month Treasury bill (FRED DTB3) and the forward, dividends included, is read "
@@ -325,7 +325,10 @@ def _panel_section(source: str, panel: dict) -> list[str]:
             f"{panel['recipe_gap_median']:+.2f} vol points from the published VIX at the "
             f"median ({panel['recipe_gap_low']:+.2f} to {panel['recipe_gap_high']:+.2f}, "
             "10th to 90th percentile); the index settles at 16:15 and the quotes are the "
-            "ones standing at the close."
+            "ones standing at the close. eSSVI crosses in time inside the quoted range on "
+            f"{int(panel['models'].loc['eSSVI', 'sessions_with_quoted_calendar'])} of "
+            f"{panel['sessions']} sessions: its calendar constraints (non-decreasing "
+            "θ and wing slopes) are necessary, not sufficient."
         ),
         _breakdown_table("VIX regime", panel["regimes"]),
         *([] if len(years) < 2 else [_breakdown_table("Year", years)]),

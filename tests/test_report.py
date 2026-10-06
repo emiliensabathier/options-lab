@@ -60,3 +60,4 @@ def test_panel_sections_render_per_source_with_attribution(surface_output, premi
     assert "The same comparison on 2 SPY closes, 2022–2022" in page
     assert 'href="https://github.com/lambdaclass/options_backtester"' in page
     assert page.count("VIX regime") == 2
+    assert "eSSVI crosses in time inside the quoted range on 2 of 2 sessions" in page
