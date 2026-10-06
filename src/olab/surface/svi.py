@@ -30,16 +30,18 @@ side) makes the constraints linear or nearly so:
 - butterfly, per slice: ``max(a, b) < 4`` and ``(a + b) max(a, b) <= 8 theta``, which is
   Gatheral and Jacquier's sufficient condition ``theta phi (1 + |rho|) < 4``,
   ``theta phi^2 (1 + |rho|) <= 4`` rewritten in these coordinates;
-- calendar, between consecutive slices: ``theta``, ``a`` and ``b`` all non-decreasing. Those
-  are necessary (the at-the-money point and both wings must not cross) but not sufficient:
-  with ``theta`` and ``a`` flat and ``b`` rising, the slope at the money, ``(a - b) / 2``,
-  falls and the later slice dips below the earlier one just right of the money. The grid
-  check in ``arbitrage.py`` is what reports those crossings; the fit does not prevent them.
+- calendar, between consecutive slices: ``theta``, ``a`` and ``b`` all non-decreasing, and
+  ``psi / theta`` non-increasing. The first three are Hendriks and Martini's necessary
+  conditions and are not enough on their own: with ``theta`` and ``a`` flat and ``b``
+  rising, the slope at the money, ``(a - b) / 2``, falls and the later slice dips below the
+  earlier one. The fourth makes them sufficient (see ``_fit_essvi_slice``).
 
-Slices are fitted in maturity order, each bounded below by the one before. Linear
-interpolation in time keeps all three sequences monotone, and since the butterfly constraint
-is convex along any segment on which ``a`` and ``b`` both increase, interpolated slices
-satisfy it too.
+Slices are fitted in maturity order, each bounded by the one before. Linear interpolation of
+``theta``, ``a`` and ``b`` is linear interpolation of ``theta``, ``psi`` and ``rho psi``,
+the scheme Corbetta et al. (2019, section 5) and Mingone (2022, section 5.1) prove
+arbitrage-free between calibrated slices: ``psi / theta`` is a ratio of two linear functions
+of time, so it stays monotone between pillars, and the butterfly constraint is convex along
+any segment on which ``a`` and ``b`` both increase.
 
 All fits minimise implied-volatility error scaled by each quote's half bid-ask spread in
 volatility terms, so a miss inside the spread costs less than one outside it. Starts come
@@ -368,15 +370,39 @@ class EssviSurface:
 
 
 def _fit_essvi_slice(quotes, floor: tuple[float, float, float], starts) -> tuple:
+    """Fit one slice inside the calendar bounds set by the previous one, ``floor``.
+
+    No calendar spread between slices ``(theta1, rho1, psi1)`` and ``(theta2, rho2, psi2)``:
+    Hendriks and Martini (2019, Proposition 3.5), as restated by Mingone (2022, "No arbitrage
+    global parametrization for the eSSVI volatility surface", arXiv:2204.00312, section 2.1):
+
+    - necessary: ``theta2 > theta1`` and ``psi2 max((1+rho1)/(1+rho2), (1-rho1)/(1-rho2)) >= psi1``,
+      that is ``a2 >= a1`` and ``b2 >= b1``;
+    - sufficient: the necessary conditions and ``psi2 <= psi1 theta2 / theta1``, or
+      ``(rho1 - psi2 rho2 / psi1)^2 <= (theta2/theta1 - 1)(psi2^2 theta1 / (psi1^2 theta2) - 1)``.
+
+    The first sufficient branch is imposed, as Mingone does, because it is a floor on
+    ``theta``: ``theta >= psi / phi_prev`` with ``phi_prev = psi1 / theta1``. The second
+    branch, which admits a rising ``psi / theta``, is not used, so the domain searched is a
+    subset of the arbitrage-free one. Hendriks and Martini's paper itself was not available
+    to check; the statement is Mingone's, whose proof of section 5.1 uses the first branch in
+    the form ``psi_u theta_t - psi_t theta_u <= 0``. Corbetta et al. (2019, section 2.2) give
+    the necessary conditions alone as necessary and sufficient; the counterexample in
+    ``tests/test_svi.py`` satisfies them and crosses.
+    """
     maturity = float(quotes["T"].iloc[0])
     k = quotes["k"].to_numpy()
     iv = quotes["iv"].to_numpy()
     scale = _scale(quotes)
     theta_prev, a_prev, b_prev = floor
+    curvature_prev = 0.5 * (a_prev + b_prev) / theta_prev if theta_prev > 0 else np.inf
+
+    def theta_floor(a, b):
+        return max(theta_prev, _butterfly_floor(a, b), 0.5 * (a + b) / curvature_prev)
 
     def unpack(p):
         a, b, slack = p
-        return max(theta_prev, _butterfly_floor(a, b)) + slack, a, b
+        return theta_floor(a, b) + slack, a, b
 
     def residual(p):
         theta, a, b = unpack(p)
@@ -389,7 +415,7 @@ def _fit_essvi_slice(quotes, floor: tuple[float, float, float], starts) -> tuple
     for theta0, a0, b0 in starts:
         a0 = float(np.clip(a0, lower[0], upper[0] - EPS))
         b0 = float(np.clip(b0, lower[1], upper[1] - EPS))
-        slack0 = max(theta0 - max(theta_prev, _butterfly_floor(a0, b0)), 0.0)
+        slack0 = max(theta0 - theta_floor(a0, b0), 0.0)
         fit = least_squares(residual, [a0, b0, slack0], bounds=(lower, upper), method="trf")
         if best is None or fit.cost < best.cost:
             best = fit

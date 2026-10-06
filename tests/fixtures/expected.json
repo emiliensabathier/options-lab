@@ -93,7 +93,7 @@
       "eSSVI": {
         "name": "eSSVI",
         "errors": {
-          "rmse_vol_points": 2.066304488408868,
+          "rmse_vol_points": 2.0663044021565202,
           "max_abs_vol_points": 13.958448920889992,
           "share_inside_spread": 0.01750291715285881,
           "quotes": 857
@@ -104,7 +104,7 @@
           "calendar_quoted": 0,
           "calendar_extrapolated": 0
         },
-        "replicated_vix": 14.992943185855134
+        "replicated_vix": 14.992942942620838
       }
     },
     "between_pillars": {

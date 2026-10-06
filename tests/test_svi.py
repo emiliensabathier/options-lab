@@ -100,6 +100,21 @@ def test_monotone_essvi_parameters_do_not_rule_out_calendar_arbitrage():
     assert calendar_violations([earlier, later]) > 0
 
 
+def test_essvi_fit_refuses_to_cross_where_the_quotes_do():
+    # Quotes read off the crossing pair above: the fit must give up some accuracy rather
+    # than reproduce the crossing, and the curvature psi / theta must not rise.
+    theta, a = 0.002, 0.05
+    table = smile_table([
+        (15 / 365, lambda k: essvi_total_variance(k, theta, a, 0.05)),
+        (16 / 365, lambda k: essvi_total_variance(k, theta, a, 0.08)),
+    ])
+    essvi = fit_essvi(table, fit_svi_surface(table, constrained=False))
+    psi = 0.5 * (essvi.wings_call + essvi.wings_put)
+    assert np.all(np.diff(psi / essvi.thetas) <= 1e-12)
+    dense = [essvi.slice(t) for t in np.linspace(15 / 365, 16 / 365, 25)]
+    assert calendar_violations(dense) == 0
+
+
 def test_essvi_needs_two_maturities():
     table = smile_table([(0.1, SHORT.total_variance)])
     with pytest.raises(CalibrationError, match="two maturities"):
