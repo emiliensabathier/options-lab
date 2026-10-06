@@ -53,6 +53,13 @@ def ranking_holds(panel: pd.DataFrame) -> pd.Series:
     return (rmse.diff(axis=1).iloc[:, 1:] > 0).all(axis=1)
 
 
+def pairwise(panel: pd.DataFrame) -> dict[tuple[str, str], float]:
+    """Share of sessions where each model fits closer than the next one in the ranking."""
+    rmse = panel.pivot(index="date", columns="model", values="rmse_vol_points")
+    return {(a, b): float((rmse[a] < rmse[b]).mean())
+            for a, b in zip(RANKING[:-1], RANKING[1:], strict=True)}
+
+
 def panel_summary(panel: pd.DataFrame) -> dict:
     """Distributions per model, ranking stability, and the CBOE recipe against the index."""
     grouped = panel.groupby("model")
@@ -80,6 +87,7 @@ def panel_summary(panel: pd.DataFrame) -> dict:
         "quotes_median": float(sessions["quotes"].median()),
         "expiries_median": float(sessions["expiries"].median()),
         "ranking_share": float(ranking_holds(panel).mean()),
+        "pairwise": pairwise(panel),
         "models": models,
         "recipe_gap_median": float(gap.median()),
         "recipe_gap_low": float(gap.quantile(LOW)),

@@ -316,7 +316,10 @@ def _panel_section(source: str, panel: dict) -> list[str]:
         ),
         _note(
             "The ranking by RMSE (free SVI, penalised SVI, eSSVI, SSVI) holds in "
-            f"{_pct(panel['ranking_share'])} of sessions. The CBOE recipe on each close sits "
+            f"{_pct(panel['ranking_share'])} of sessions; pair by pair, "
+            + "; ".join(f"{a} beats {b} in {_pct(share)}"
+                        for (a, b), share in panel["pairwise"].items())
+            + ". The CBOE recipe on each close sits "
             f"{panel['recipe_gap_median']:+.2f} vol points from the published VIX at the "
             f"median ({panel['recipe_gap_low']:+.2f} to {panel['recipe_gap_high']:+.2f}, "
             "10th to 90th percentile); the index settles at 16:15 and the quotes are the "

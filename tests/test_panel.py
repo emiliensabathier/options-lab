@@ -67,6 +67,8 @@ def test_summary_reports_distributions_per_model_and_the_recipe_gap():
     assert essvi["sessions_with_quoted_butterfly"] == 0
     assert summary["models"].loc["SVI per slice", "sessions_with_quoted_butterfly"] == 3
     assert summary["recipe_gap_median"] == pytest.approx(0.5)
+    assert summary["pairwise"][("eSSVI", "SSVI")] == pytest.approx(2 / 3)
+    assert summary["pairwise"][("SVI per slice", "SVI + penalties")] == pytest.approx(1.0)
 
 
 def _fails(*_):
