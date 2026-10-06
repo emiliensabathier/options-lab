@@ -34,8 +34,10 @@ on thousands of grid points. The replication integral reads those wings, and the
 gives the 30-day vol furthest from the CBOE recipe on the same chain (16.03 against
 15.31). Adding penalties, the approach taken by the open-source SVI calibrators this
 project started from, removes most of the wing arbitrage but moves calendar violations
-inside the quoted range. The two SSVI fits are arbitrage-free by construction (SSVI by
-theorem, eSSVI by checked constraints) and cost about two vol points of fit: eSSVI misses
+inside the quoted range. SSVI is arbitrage-free by theorem. eSSVI is
+butterfly-free by construction and calendar-clean on this chain, but its calendar
+constraints are necessary only, and on the historical panels below it crosses on about
+a quarter to half of the sessions. Both cost about two vol points of fit: eSSVI misses
 by 2 to 4 points out to one month, about one point at three to six months and under half a
 point at one year. Every constrained model, penalised SVI included, misses its worst quote
 by about 20 points. One SSVI shape per expiry cannot follow the curvature of a short-dated
@@ -133,13 +135,53 @@ Full report with term structure, parity forwards, the quote ledger and regimes:
 - Open-source SVI calibrators on GitHub for the penalised baseline. Code under copyleft
   licences (AGPL) was read for ideas only; none of it is copied here.
 
+### Data sources
+
+- **2026 capture**: Yahoo Finance via `yfinance`, frozen in `data/raw/`.
+- **SPX/SPXW closes, 2022H2**: end-of-day chains from
+  [HistoricalData.net](https://historicaldata.net/options.html), free sample, used under
+  its licence, which requires this credit and forbids redistributing the data. Only
+  per-session aggregates (`data/panel/`) are committed; `scripts/fetch_eod_sample.py`
+  downloads the files.
+- **SPY closes, 2008-01-02 to 2025-12-12**: the `data-v1` release of
+  [lambdaclass/options_backtester](https://github.com/lambdaclass/options_backtester),
+  which redistributes it "for research and educational reproducibility". It credits an
+  upstream repository, philippdubach/options-data, announced as MIT but no longer online,
+  and the data most likely comes from Alpha Vantage. The terms under which the original
+  quotes may be reused are therefore not established; this project treats the archive as
+  research input, commits only aggregates, and `scripts/fetch_spy_archive.py` downloads it
+  from the release. Read with column and date filters, the 25-million-row file never has
+  to fit in memory.
+- **Three-month Treasury bill** for the SPY discount: FRED series
+  [DTB3](https://fred.stlouisfed.org/series/DTB3), public domain, fetched by the same
+  script.
+
 ## Limitations
 
 Stated because they matter more than the headline numbers.
 
-- **One snapshot.** The surface comparison rests on a single capture. Rankings between
-  models are unlikely to flip, but the counts and misses are one afternoon's numbers, not a
-  distribution.
+- **The headline is still one afternoon.** The tables at the top are the 2026-10-05
+  capture. The panels below them turn its counts into distributions, but on other data:
+  SPX closes from a bear market (2022, VIX mostly 20 to 35) and SPY closes up to
+  2025-12-12. Nothing archived covers 2025-12-13 to the capture; the capture itself and
+  the daily captures a server takes from 2026-10-06 are the only data for that stretch.
+- **SPY is not SPX.** SPY options are American, settle into shares at the 16:00 close and
+  pay through a fund that distributes dividends. Put-call parity does not hold for them:
+  an in-the-money put sits on its exercise value, and the parity slope read on SPY closes
+  gives discount factors from 1.005 to 1.04, which refused most sessions until the method
+  changed. For SPY the discount is pinned to the three-month Treasury bill (FRED DTB3,
+  one rate for every maturity up to a year) and the forward is read from strikes below
+  spot, where the in-the-money leg is a call. Only out-of-the-money quotes enter the
+  fits, and their small early-exercise premium is read as volatility. Maturities stop at
+  one year, and dividends are absorbed by the forward. SPY trades at about a tenth of
+  SPX, so its 30-day variance compares with the VIX, but the CBOE recipe run on SPY is an
+  approximation of the index, not the index.
+- **The SPY archive has no last-trade date.** The 30-day staleness filter cannot be
+  applied, so stale quotes stay in the SPY panel; its arbitrage counts are an upper bound
+  next to the SPX ones.
+- **The two archives are one feed.** On the 127 sessions both cover, every SPY bid and ask
+  is identical (see the cross-check below). The 2022 overlap is a check that the SPY
+  adapter reads what it should, not an independent confirmation.
 - **Delayed, and in places stale, quotes.** Yahoo serves 15-minute delayed quotes and
   leaves a contract's bid and ask as they stood at its last trade. Without the 30-day
   last-trade filter the chain shows 367 executable vertical and 594 butterfly arbitrages;
@@ -151,7 +193,20 @@ Stated because they matter more than the headline numbers.
 - **The VIX check is not instantaneous.** The index is live and the quotes are delayed,
   so 15.31 against 15.57 mixes recipe error with fifteen minutes of market.
 - **eSSVI's calendar condition is necessary, not sufficient.** Non-decreasing `θ`, `a`, `b`
-  is required; sufficiency was verified numerically on a dense grid, not proved.
+  is required, not enough: with `θ` and `a` flat and `b` rising, the at-the-money slope
+  `(a − b)/2` falls and the later slice dips below the earlier one just right of the money
+  (`tests/test_svi.py` holds the counterexample). The fitted parameters on the failing
+  sessions are monotone to machine precision, one root is kept per expiry (SPXW over SPX;
+  SPY has a single root and no duplicate contracts), and the gaps are far above the
+  1e-9 tolerance, so this is the model, not the fit, the audit or the data. It shows
+  between expiries one to three days apart where `θ` sits at its floor: on 2022-08-15 the
+  16-day slice is 7% below the 15-day one in total variance at k = 0.04. Counted over the
+  panels, eSSVI has calendar violations on **19 of 33** HD sessions (inside the quoted
+  range on 15, up to 922 grid points) and on **15 of 55** SPY quarterly sessions (quoted
+  on 12, up to 299), about 1–4% of the grid between consecutive expiries. Butterfly stays
+  at zero everywhere. On the 2026 capture the dense-grid check finds no crossing; that is a
+  property of that chain, not a guarantee. A sufficient condition (Hendriks and Martini
+  give one) would have to be imposed in the fit to close this.
 - **Penalties do not guarantee freedom from arbitrage.** The penalised SVI keeps 596
   calendar violations inside the quoted range. That is a finding about the approach, and
   it is reported rather than tuned away.
@@ -175,6 +230,24 @@ The full surface run takes about four minutes. Inputs are the frozen captures in
 `data/raw/`; `scripts/capture_chain.py` (during US market hours) and
 `scripts/capture_history.py` take new ones, with `pip install -e ".[capture]"`.
 `scripts/build_readme_chart.py` redraws the chart above.
+
+The session panels need the archives, which are not in the repository (see Data sources):
+
+```bash
+pip install -e ".[archive]"
+python scripts/fetch_eod_sample.py            # HistoricalData.net SPX/SPXW closes, 2022H2
+python scripts/fetch_spy_archive.py           # SPY closes 2008-2025, about 600 MB
+python scripts/run_panel.py --source hd --period W
+python scripts/run_panel.py --source spy --period M
+python scripts/cross_check_sources.py         # needs both
+```
+
+Each session takes two to three minutes, most of it in the penalised SVI, and the runner
+resumes where it stopped. On a machine with other work running, set
+`OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1`: the fits call small linear
+algebra kernels many times, and a BLAS that spreads each call over every core made a
+session three times slower here, not faster. The report picks up whichever panels exist
+in `data/panel/`.
 
 ## Tests
 

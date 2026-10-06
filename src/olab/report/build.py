@@ -256,8 +256,10 @@ def _spy_intro(panel: dict) -> tuple[str, str]:
         f"{panel['first'][:4]}–{panel['last'][:4]}",
         f"The first session of each month from {panel['first']} to {panel['last']}, SPY "
         "options rather than SPX: American exercise, so only out-of-the-money quotes and "
-        "maturities up to one year; dividends sit inside the parity forward; no last-trade "
-        "date, so the 30-day staleness rule is not applied. A median session kept "
+        "maturities up to one year; parity cannot give the discount, so it is pinned to the "
+        "three-month Treasury bill (FRED DTB3) and the forward, dividends included, is read "
+        "below spot; no last-trade date, so the 30-day staleness rule is not applied. A "
+        "median session kept "
         f"{panel['quotes_median']:,.0f} quotes over {panel['expiries_median']:.0f} expiries; "
         f"the published VIX ranged from {low:.1f} to {high:.1f}. SPY is about a tenth of "
         "SPX, so its 30-day variance compares with the VIX, but the CBOE recipe on SPY is an "
