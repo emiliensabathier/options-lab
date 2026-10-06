@@ -90,6 +90,16 @@ def test_essvi_chain_respects_its_constraints_between_and_on_pillars():
         essvi.params_at(0.05)
 
 
+def test_monotone_essvi_parameters_do_not_rule_out_calendar_arbitrage():
+    # Same theta and call wing, steeper put wing: the slope at the money is (a - b) / 2,
+    # so the later slice dips below the earlier one just right of the money. This is the
+    # pattern the 2022 and SPY panels show between expiries one to three days apart.
+    theta, a = 0.002, 0.05
+    earlier = lambda k: essvi_total_variance(k, theta, a, 0.05)  # noqa: E731
+    later = lambda k: essvi_total_variance(k, theta, a, 0.08)  # noqa: E731
+    assert calendar_violations([earlier, later]) > 0
+
+
 def test_essvi_needs_two_maturities():
     table = smile_table([(0.1, SHORT.total_variance)])
     with pytest.raises(CalibrationError, match="two maturities"):

@@ -31,8 +31,10 @@ side) makes the constraints linear or nearly so:
   Gatheral and Jacquier's sufficient condition ``theta phi (1 + |rho|) < 4``,
   ``theta phi^2 (1 + |rho|) <= 4`` rewritten in these coordinates;
 - calendar, between consecutive slices: ``theta``, ``a`` and ``b`` all non-decreasing. Those
-  are necessary (the at-the-money point and both wings must not cross); they are not proven
-  sufficient here, which is why the grid check in ``arbitrage.py`` is run on the result.
+  are necessary (the at-the-money point and both wings must not cross) but not sufficient:
+  with ``theta`` and ``a`` flat and ``b`` rising, the slope at the money, ``(a - b) / 2``,
+  falls and the later slice dips below the earlier one just right of the money. The grid
+  check in ``arbitrage.py`` is what reports those crossings; the fit does not prevent them.
 
 Slices are fitted in maturity order, each bounded below by the one before. Linear
 interpolation in time keeps all three sequences monotone, and since the butterfly constraint
