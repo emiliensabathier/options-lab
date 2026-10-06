@@ -14,6 +14,7 @@ from olab.surface.arbitrage import K_GRID
 from olab.surface.quotes import MAX_QUOTE_AGE_DAYS
 
 TITLE = "SPX volatility surface and variance risk premium"
+PANEL_SOURCE = "https://historicaldata.net/options.html"
 
 STYLE = """
 body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin: 0 auto;
@@ -230,8 +231,56 @@ def _premium_section(premium: PremiumOutput) -> list[str]:
     ]
 
 
-def build_report(surface: SurfaceOutput, premium: PremiumOutput) -> str:
-    """Render the whole report as one self-contained HTML document."""
+def _panel_section(panel: dict) -> list[str]:
+    rows = [
+        [
+            name,
+            f"{_num(m['rmse_median'])} ({_num(m['rmse_low'])}–{_num(m['rmse_high'])})",
+            _pct(m["inside_median"]),
+            f"{int(m['sessions_with_quoted_butterfly'])} / {panel['sessions']}",
+            f"{int(m['sessions_with_quoted_calendar'])} / {panel['sessions']}",
+            f"{m['wings_median']:,.0f}",
+            f"{m['replicated_minus_published_median']:+.2f}",
+        ]
+        for name, m in panel["models"].iterrows()
+    ]
+    low, high = panel["published_vix_range"]
+    return [
+        f"<h2>The same comparison on {panel['sessions']} sessions of 2022</h2>",
+        _note(
+            f"End-of-day SPX and SPXW chains from {panel['first']} to {panel['last']}, run "
+            "through the same screen, fits and audits as the capture above; a median "
+            f"session kept {panel['quotes_median']:,.0f} quotes over "
+            f"{panel['expiries_median']:.0f} expiries. The published VIX ranged from "
+            f"{low:.1f} to {high:.1f}: a bear market, not a calm one. Data: "
+            f'<a href="{PANEL_SOURCE}">HistoricalData.net</a> free 2022H2 sample; its '
+            "licence allows these aggregates and not the quotes, which are not "
+            "redistributed here."
+        ),
+        _table(
+            ["Model", "RMSE median (10–90%)", "Inside bid-ask, median",
+             "Sessions with quoted butterfly", "Sessions with quoted calendar",
+             "Wing violations, median", "30-day vol − VIX, median"],
+            rows,
+        ),
+        _note(
+            "The ranking by RMSE (free SVI, penalised SVI, eSSVI, SSVI) holds in "
+            f"{_pct(panel['ranking_share'])} of sessions. The CBOE recipe on each close sits "
+            f"{panel['recipe_gap_median']:+.2f} vol points from the published VIX at the "
+            f"median ({panel['recipe_gap_low']:+.2f} to {panel['recipe_gap_high']:+.2f}, "
+            "10th to 90th percentile); the index settles at 16:15 and the quotes are the "
+            "ones standing at the close."
+        ),
+    ]
+
+
+def build_report(
+    surface: SurfaceOutput, premium: PremiumOutput, panel: dict | None = None
+) -> str:
+    """Render the whole report as one self-contained HTML document.
+
+    ``panel`` is ``olab.panel.panel_summary`` of the multi-session run, when there is one.
+    """
     snapshot = surface.snapshot
     sections = [
         f"<h1>{TITLE}</h1>",
@@ -245,6 +294,7 @@ def build_report(surface: SurfaceOutput, premium: PremiumOutput) -> str:
         term_chart(surface.quotes.table, surface.surfaces["SVI per slice"], snapshot.levels),
         *_forwards_section(surface),
         *_chain_section(surface),
+        *([] if panel is None else _panel_section(panel)),
         *_premium_section(premium),
     ]
     body = "\n".join(sections)

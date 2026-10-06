@@ -45,3 +45,17 @@ def test_cli_writes_the_report(tmp_path, monkeypatch, surface_output, premium_ou
 def test_cli_explains_a_missing_capture(tmp_path):
     with pytest.raises(SystemExit, match="capture_chain"):
         cli.latest_chain(tmp_path)
+
+
+def test_panel_section_renders_with_attribution_when_a_panel_is_given(
+    surface_output, premium_output
+):
+    from olab.panel import panel_summary
+    from test_panel import _panel
+
+    summary = panel_summary(_panel([(0.1, 0.5, 1.8, 2.0), (0.3, 0.7, 2.2, 2.0)]))
+    page = build_report(surface_output, premium_output, summary)
+
+    assert "The same comparison on 2 sessions of 2022" in page
+    assert 'href="https://historicaldata.net/options.html"' in page
+    assert "holds in 50.0% of sessions" in page

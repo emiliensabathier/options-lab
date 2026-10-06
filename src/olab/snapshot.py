@@ -34,7 +34,7 @@ class Snapshot:
     levels: dict[str, float]
 
 
-def _parse_symbols(quotes: pd.DataFrame) -> pd.DataFrame:
+def parse_symbols(quotes: pd.DataFrame) -> pd.DataFrame:
     parsed = quotes["contractSymbol"].str.extract(SYMBOL)
     unparsed = parsed["root"].isna()
     if unparsed.any():
@@ -82,6 +82,6 @@ def load_snapshot(chain_csv: Path, meta_json: Path) -> Snapshot:
         raise DataError("capture metadata carries no ^SPX level")
 
     as_of = pd.Timestamp(meta["captured_from_utc"]).tz_convert("UTC")
-    quotes = select_roots(_parse_symbols(quotes))
+    quotes = select_roots(parse_symbols(quotes))
     quotes = quotes.assign(T=year_fractions(quotes, as_of))
     return Snapshot(quotes=quotes, as_of=as_of, spot=levels["^SPX"], levels=levels)

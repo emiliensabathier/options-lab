@@ -87,7 +87,11 @@ def _evaluate(name: str, surface, table: pd.DataFrame) -> ModelResult:
 
 def run_surface(chain_csv: Path, meta_json: Path) -> SurfaceOutput:
     """Quotes to forwards to four fitted surfaces, each audited the same way."""
-    snapshot = load_snapshot(chain_csv, meta_json)
+    return surface_from_snapshot(load_snapshot(chain_csv, meta_json))
+
+
+def surface_from_snapshot(snapshot: Snapshot) -> SurfaceOutput:
+    """The surface half of the study on any snapshot, a Yahoo capture or an archived close."""
     quotes = build_quotes(snapshot.quotes, snapshot.spot, snapshot.as_of)
     table = quotes.table
 
