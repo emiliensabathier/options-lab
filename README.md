@@ -52,6 +52,72 @@ sits up to 14 vol points under the deep out-of-the-money puts, the strikes a cra
 is bought at. An average error of two points hides that; the picture does not. The free
 SVI follows those puts, then turns sharply upward in the call wing it has no quotes for.
 
+### Across sessions: the same audit on archived closes
+
+One afternoon is one draw. The same four fits and the same audit were run on two archives
+of end-of-day chains (sources and terms under [Data sources](#data-sources)); per-session
+aggregates are in `data/panel/`, the quotes themselves are not redistributed.
+
+**SPX/SPXW, 2022H2, weekly** ([HistoricalData.net](https://historicaldata.net/options.html)
+free sample): 33 sessions from 2022-07-01 to 2022-12-27, a bear market with the VIX between
+20 and 32, a median 5,415 quotes over 37 expiries per session.
+
+| Model | RMSE median (10–90%) | Inside bid-ask | Sessions with quoted butterfly | Sessions with quoted calendar | Wing violations, median | 30-day vol − VIX, median |
+| --- | --- | --- | --- | --- | --- | --- |
+| SVI per slice | 0.42 (0.27–0.54) | 21.6% | 5 / 33 | 32 / 33 | 7,629 | +0.36 |
+| SVI + penalties | 1.13 (0.41–5.66) | 17.3% | 15 / 33 | 29 / 33 | 2,618 | +8.31 |
+| eSSVI | 1.25 (1.09–1.51) | 12.5% | 0 / 33 | 15 / 33 | 70 | −0.36 |
+| SSVI | 1.43 (1.24–1.78) | 8.6% | 0 / 33 | 0 / 33 | 0 | −0.35 |
+
+**SPY, 2008–2025** ([lambdaclass/options_backtester](https://github.com/lambdaclass/options_backtester)
+archive): 107 sessions from 2008-01-02 to 2025-10-01, monthly to 2012 and quarterly after
+(the monthly pass was stopped there; the script resumes it), VIX from 9 to 69. Before 2013
+the archive holds a median 587 quotes per session, after it 1,795. Medians over this panel
+lean on 2008–2012, which supplies 57 of the 107 sessions.
+
+| Model | RMSE median (10–90%) | Inside bid-ask | Sessions with quoted butterfly | Sessions with quoted calendar | Wing violations, median | 30-day vol − VIX, median |
+| --- | --- | --- | --- | --- | --- | --- |
+| SVI per slice | 0.29 (0.15–5.31) | 78.6% | 25 / 107 | 54 / 107 | 4,353 | +11.42 |
+| SVI + penalties | 0.48 (0.22–1.07) | 42.6% | 7 / 107 | 41 / 107 | 871 | +12.29 |
+| eSSVI | 0.66 (0.34–1.97) | 55.2% | 0 / 107 | 21 / 107 | 0 | −0.29 |
+| SSVI | 0.85 (0.47–2.24) | 42.0% | 0 / 107 | 0 / 107 | 0 | −0.16 |
+
+By VIX regime (SPY; median RMSE in vol points):
+
+| VIX regime | Sessions | Ranking holds | SVI | SVI + pen. | eSSVI | SSVI | Recipe − VIX |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| below 15 | 19 | 53% | 0.29 | 0.52 | 1.01 | 1.26 | −0.24 |
+| 15 to 25 | 60 | 62% | 0.25 | 0.56 | 0.57 | 0.77 | −0.33 |
+| 25 and above | 28 | 68% | 0.35 | 0.38 | 0.57 | 0.85 | −0.62 |
+
+By year, the eSSVI and SSVI misses grow with the chains: about half a point in 2008–2011,
+when SPY listed a handful of monthly expiries, and two points by 2024–2025, close to the
+2026 SPX figure, once weekly and daily expiries put steep short-dated smiles in the fit.
+
+What carries over from the snapshot, and what does not:
+
+- **The order of fit is stable in pairs, not as a whole.** The full ranking (free SVI,
+  penalised SVI, eSSVI, SSVI) holds on 61% of HD sessions and 62% of SPY ones. eSSVI beats
+  SSVI on 100% and 97%; free SVI beats penalised SVI on 100% and 80%. The pair that
+  breaks most is penalised SVI against eSSVI (61% and 74%): the penalties sometimes cost
+  more fit than the eSSVI shape does.
+- **Only SSVI is clean everywhere.** It has no butterfly or calendar violation on any of
+  the 140 sessions. eSSVI never has a butterfly violation, but crosses in time on 19 of 33
+  HD sessions and 24 of 107 SPY ones (see [Limitations](#limitations)).
+- **Free wings break the replication.** The free and penalised SVI 30-day variances sit
+  more than five points above the VIX on about half the SPY sessions and up to 369 points
+  above it on one HD session; the two SSVI fits stay within two points of the index on
+  every session. The snapshot's free fit, 16.03 against a VIX of 15.57, was the mild end
+- **The CBOE recipe sits a little under the index.** Median −0.26 points on SPX (10–90%:
+  −0.41 to +0.05) and −0.37 on SPY, which is not the index's underlying. It finds no
+  usable pair of expiries on 14 of 33 HD sessions and on every SPY session before 2013;
+  those sessions are left out of the gap rather than filled.
+- **The two archives are one feed.** On the 127 sessions both cover (July to December
+  2022), 1,086,488 SPY contracts match by symbol, every bid is identical, and so is every ask
+  present in both (largest absolute difference 0; the 180 exceptions are contracts with a
+  blank HD ask, 36 on each of five August sessions; `data/panel/cross_check_spy_2022h2.csv`). Agreement
+  between the HD and SPY panels is therefore not independent confirmation.
+
 ### The premium: what selling that volatility has earned
 
 A 30-day variance swap struck at every VIX close from 1990, settled on the next 21 trading
@@ -179,8 +245,8 @@ Stated because they matter more than the headline numbers.
 - **The SPY archive has no last-trade date.** The 30-day staleness filter cannot be
   applied, so stale quotes stay in the SPY panel; its arbitrage counts are an upper bound
   next to the SPX ones.
-- **The two archives are one feed.** On the 127 sessions both cover, every SPY bid and ask
-  is identical (see the cross-check below). The 2022 overlap is a check that the SPY
+- **The two archives are one feed.** On the 127 sessions both cover, every SPY bid and every ask
+  quoted in both is identical (see the panels above). The 2022 overlap is a check that the SPY
   adapter reads what it should, not an independent confirmation.
 - **Delayed, and in places stale, quotes.** Yahoo serves 15-minute delayed quotes and
   leaves a contract's bid and ask as they stood at its last trade. Without the 30-day
@@ -202,8 +268,8 @@ Stated because they matter more than the headline numbers.
   between expiries one to three days apart where `θ` sits at its floor: on 2022-08-15 the
   16-day slice is 7% below the 15-day one in total variance at k = 0.04. Counted over the
   panels, eSSVI has calendar violations on **19 of 33** HD sessions (inside the quoted
-  range on 15, up to 922 grid points) and on **15 of 55** SPY quarterly sessions (quoted
-  on 12, up to 299), about 1–4% of the grid between consecutive expiries. Butterfly stays
+  range on 15, up to 922 grid points) and on **24 of 107** SPY sessions (quoted on 21, up
+  to 1,049), 1–5% of the grid between consecutive expiries on the sessions hit. Butterfly stays
   at zero everywhere. On the 2026 capture the dense-grid check finds no crossing; that is a
   property of that chain, not a guarantee. A sufficient condition (Hendriks and Martini
   give one) would have to be imposed in the fit to close this.
