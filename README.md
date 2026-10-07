@@ -5,6 +5,16 @@ chain, and the premium a seller of that volatility has collected since 1990.
 
 ![ci](https://github.com/emiliensabathier/options-lab/actions/workflows/ci.yml/badge.svg)
 
+![Market bid-ask against the free SVI and eSSVI fits at one week, one month and six months](docs/smile.png)
+
+**In short**
+
+- The free SVI fit sits 0.13 vol points from the quotes, but its extrapolated wings break no-arbitrage at thousands of grid points; the arbitrage-free SSVI and eSSVI fits pay for being clean with about two points of error (SPX chain of 2026-10-05).
+- Across 238 archived sessions (SPX 2022, SPY 2008–2025), eSSVI under the sufficient Hendriks-Martini calendar condition has zero arbitrage on every session, for a median cost of 0.07 vol points on SPX 2022.
+- Selling 30-day variance at the VIX since 1990 earned a Sharpe of 1.19 with a skew of −6.17; the worst window, COVID, lost almost three years of average gains.
+
+Rendered report: <https://emiliensabathier.github.io/options-lab/>
+
 ## Results
 
 ### The surface: closeness to quotes against freedom from arbitrage
@@ -45,9 +55,7 @@ smile, and the sufficient butterfly condition it is held to is tight when total 
 is small, which flattens the one-week skew further; how much of the gap each explains is
 not separated here.
 
-![Market bid-ask against the free SVI and eSSVI fits at one week, one month and six months](docs/smile.png)
-
-The chart shows where eSSVI pays for being arbitrage-free: at one week and one month it
+The chart at the top of this page shows where eSSVI pays for being arbitrage-free: at one week and one month it
 sits up to 14 vol points under the deep out-of-the-money puts, the strikes a crash hedge
 is bought at. An average error of two points hides that; the picture does not. The free
 SVI follows those puts, then turns sharply upward in the call wing it has no quotes for.
