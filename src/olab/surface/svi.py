@@ -31,17 +31,20 @@ side) makes the constraints linear or nearly so:
   Gatheral and Jacquier's sufficient condition ``theta phi (1 + |rho|) < 4``,
   ``theta phi^2 (1 + |rho|) <= 4`` rewritten in these coordinates;
 - calendar, between consecutive slices: ``theta``, ``a`` and ``b`` all non-decreasing, and
-  ``psi / theta`` non-increasing. The first three are Hendriks and Martini's necessary
-  conditions and are not enough on their own: with ``theta`` and ``a`` flat and ``b``
-  rising, the slope at the money, ``(a - b) / 2``, falls and the later slice dips below the
-  earlier one. The fourth makes them sufficient (see ``_fit_essvi_slice``).
+  either ``psi / theta`` non-increasing or Hendriks and Martini's second sufficient
+  inequality. The first three are their necessary conditions and are not enough on their
+  own: with ``theta`` and ``a`` flat and ``b`` rising, the slope at the money,
+  ``(a - b) / 2``, falls and the later slice dips below the earlier one. Either of the
+  other two makes them sufficient (see ``_fit_essvi_slice``).
 
 Slices are fitted in maturity order, each bounded by the one before. Linear interpolation of
 ``theta``, ``a`` and ``b`` is linear interpolation of ``theta``, ``psi`` and ``rho psi``,
 the scheme Corbetta et al. (2019, section 5) and Mingone (2022, section 5.1) prove
-arbitrage-free between calibrated slices: ``psi / theta`` is a ratio of two linear functions
-of time, so it stays monotone between pillars, and the butterfly constraint is convex along
-any segment on which ``a`` and ``b`` both increase.
+arbitrage-free between slices that satisfy the first branch: ``psi / theta`` is a ratio of
+two linear functions of time, so it stays monotone between pillars. The butterfly constraint
+is convex, so it holds along any segment whose ends satisfy it. A pair joined through the
+second branch carries no such proof, and some do cross in between, so that pair is kept only
+if its interpolation passes a dense calendar check.
 
 All fits minimise implied-volatility error scaled by each quote's half bid-ask spread in
 volatility terms, so a miss inside the spread costs less than one outside it. Starts come
@@ -55,9 +58,10 @@ from itertools import product
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 
 from olab.errors import CalibrationError
+from olab.surface.arbitrage import K_GRID, TOLERANCE
 from olab.surface.arbitrage import durrleman_g as _durrleman_g
 
 MIN_HALF_SPREAD = 0.0025  # vol floor on the residual scale: 25 bp, so no quote dominates
@@ -321,6 +325,7 @@ def fit_ssvi(quotes: pd.DataFrame, atm_guess: dict[float, float]) -> SsviSurface
 # --- eSSVI, chained slices -------------------------------------------------------------------
 
 WING_LIMIT = 4.0 - 1e-6
+INTERPOLATION_STEPS = 64  # maturities checked between two pillars joined by the second branch
 
 
 def essvi_total_variance(k, theta: float, a: float, b: float):
@@ -381,14 +386,17 @@ def _fit_essvi_slice(quotes, floor: tuple[float, float, float], starts) -> tuple
     - sufficient: the necessary conditions and ``psi2 <= psi1 theta2 / theta1``, or
       ``(rho1 - psi2 rho2 / psi1)^2 <= (theta2/theta1 - 1)(psi2^2 theta1 / (psi1^2 theta2) - 1)``.
 
-    The first sufficient branch is imposed, as Mingone does, because it is a floor on
-    ``theta``: ``theta >= psi / phi_prev`` with ``phi_prev = psi1 / theta1``. The second
-    branch, which admits a rising ``psi / theta``, is not used, so the domain searched is a
-    subset of the arbitrage-free one. Hendriks and Martini's paper itself was not available
-    to check; the statement is Mingone's, whose proof of section 5.1 uses the first branch in
-    the form ``psi_u theta_t - psi_t theta_u <= 0``. Corbetta et al. (2019, section 2.2) give
-    the necessary conditions alone as necessary and sufficient; the counterexample in
-    ``tests/test_svi.py`` satisfies them and crosses.
+    Both sufficient branches are searched. The first, as Mingone imposes it, is a floor on
+    ``theta``: ``theta >= psi / phi_prev`` with ``phi_prev = psi1 / theta1``, fitted by
+    bounded least squares. The second admits a rising ``psi / theta`` and is not a bound on
+    any one parameter, so it is fitted separately under explicit constraints
+    (``_fit_second_branch``). It is kept when it fits better and the straight line between the
+    two slices stays free of calendar arbitrage, which Mingone's interpolation proof does not
+    cover outside the first branch. Hendriks and Martini's paper itself was not available to
+    check; the statement is Mingone's, and ``tests/test_svi.py`` checks the transcription on
+    random pairs. Corbetta et al. (2019, section 2.2) give the necessary conditions alone as
+    necessary and sufficient; the counterexample in ``tests/test_svi.py`` satisfies them and
+    crosses.
     """
     maturity = float(quotes["T"].iloc[0])
     k = quotes["k"].to_numpy()
@@ -419,7 +427,69 @@ def _fit_essvi_slice(quotes, floor: tuple[float, float, float], starts) -> tuple
         fit = least_squares(residual, [a0, b0, slack0], bounds=(lower, upper), method="trf")
         if best is None or fit.cost < best.cost:
             best = fit
-    return unpack(best.x)
+    first = unpack(best.x)
+    if theta_prev <= 0:
+        return first
+
+    def cost(params) -> float:
+        theta, a, b = params
+        miss = (np.sqrt(essvi_total_variance(k, theta, a, b) / maturity) - iv) / scale
+        return 0.5 * float(miss @ miss)
+
+    second = _fit_second_branch(cost, floor, [first, *starts])
+    if (second is not None and cost(second) < cost(first)
+            and interpolates_without_calendar_arbitrage(floor, second)):
+        return second
+    return first
+
+
+def second_branch_margin(earlier, later) -> float:
+    """Hendriks and Martini's second sufficient calendar inequality, non-negative where it holds.
+
+    ``(theta2/theta1 - 1)(psi2^2 theta1 / (psi1^2 theta2) - 1) - (rho1 - psi2 rho2 / psi1)^2``
+    in wing coordinates, where ``psi = (a + b) / 2`` and ``psi rho = (a - b) / 2``.
+    """
+    theta1, a1, b1 = earlier
+    theta2, a2, b2 = later
+    growth = theta2 / theta1
+    psi_ratio = (a2 + b2) / (a1 + b1)
+    skew_gap = ((a1 - b1) - (a2 - b2)) / (a1 + b1)
+    return (growth - 1) * (psi_ratio**2 / growth - 1) - skew_gap**2
+
+
+def interpolates_without_calendar_arbitrage(earlier, later, k: np.ndarray = K_GRID) -> bool:
+    """Whether total variance rises along the straight line from one slice to the next."""
+    start, end = np.asarray(earlier, dtype=float), np.asarray(later, dtype=float)
+    weights = np.linspace(0.0, 1.0, INTERPOLATION_STEPS + 1)
+    w = np.array([essvi_total_variance(k, *(start + t * (end - start))) for t in weights])
+    return bool(np.all(np.diff(w, axis=0) >= -TOLERANCE))
+
+
+def _fit_second_branch(cost, floor, starts) -> tuple | None:
+    """Best slice satisfying the necessary, butterfly and second-branch conditions, if any."""
+    theta_prev, a_prev, b_prev = floor
+    bounds = [(theta_prev, None), (max(a_prev, EPS), WING_LIMIT), (max(b_prev, EPS), WING_LIMIT)]
+    constraints = [
+        {"type": "ineq", "fun": lambda x: x[0] - theta_prev * (1 + EPS)},
+        {"type": "ineq", "fun": lambda x: 8 * x[0] - (x[1] + x[2]) * max(x[1], x[2])},
+        {"type": "ineq", "fun": lambda x: second_branch_margin(floor, x)},
+    ]
+
+    def admissible(theta, a, b) -> bool:
+        return (theta > theta_prev and a_prev <= a <= WING_LIMIT and b_prev <= b <= WING_LIMIT
+                and (a + b) * max(a, b) <= 8 * theta
+                and second_branch_margin(floor, (theta, a, b)) >= 0)
+
+    best = None
+    for theta0, a0, b0 in starts:
+        start = [max(theta0, theta_prev * 1.01), float(np.clip(a0, *bounds[1])),
+                 float(np.clip(b0, *bounds[2]))]
+        fit = minimize(cost, start, method="SLSQP", bounds=bounds, constraints=constraints,
+                       options={"maxiter": 500, "ftol": 1e-12})
+        candidate = tuple(float(v) for v in fit.x)
+        if admissible(*candidate) and (best is None or cost(candidate) < cost(best)):
+            best = candidate
+    return best
 
 
 def fit_essvi(quotes: pd.DataFrame, svi: SviSurface) -> EssviSurface:

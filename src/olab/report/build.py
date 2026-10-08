@@ -297,7 +297,8 @@ def _essvi_calendar_note(panel: dict) -> str:
     crossed = int(panel["models"].loc["eSSVI", "sessions_with_quoted_calendar"])
     condition = (
         "its fit imposes the sufficient calendar condition of Hendriks and Martini (2019), "
-        "Prop. 3.5 (non-decreasing θ and wing slopes, non-increasing ψ/θ)."
+        "Prop. 3.5 (non-decreasing θ and wing slopes, and either non-increasing ψ/θ or its "
+        "second inequality)."
     )
     if crossed == 0:
         return f"eSSVI never crosses in time inside the quoted range: {condition}"

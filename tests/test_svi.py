@@ -13,6 +13,8 @@ from olab.surface.svi import (
     fit_ssvi,
     fit_svi_slice,
     fit_svi_surface,
+    interpolates_without_calendar_arbitrage,
+    second_branch_margin,
 )
 
 SHORT = SviSlice(a=0.002, b=0.05, rho=-0.6, m=0.01, sigma=0.08, maturity=0.1)
@@ -109,10 +111,70 @@ def test_essvi_fit_refuses_to_cross_where_the_quotes_do():
         (16 / 365, lambda k: essvi_total_variance(k, theta, a, 0.08)),
     ])
     essvi = fit_essvi(table, fit_svi_surface(table, constrained=False))
-    psi = 0.5 * (essvi.wings_call + essvi.wings_put)
-    assert np.all(np.diff(psi / essvi.thetas) <= 1e-12)
     dense = [essvi.slice(t) for t in np.linspace(15 / 365, 16 / 365, 25)]
     assert calendar_violations(dense) == 0
+
+
+# (theta, a, b) pairs. RISING: psi / theta rises (first branch fails), the second branch
+# holds, and the straight line between the two stays calendar-free. CROSSING_BETWEEN: the
+# second branch holds at the pillars, but the linear interpolation dips in between.
+RISING = ((0.02, 0.1, 0.3), (0.022, 0.12, 0.33))
+CROSSING_BETWEEN = ((0.049, 0.19, 0.05), (0.059, 0.35, 0.08))
+
+
+def _psi_over_theta(theta, a, b):
+    return 0.5 * (a + b) / theta
+
+
+def test_second_branch_rules_out_calendar_spreads_on_random_pairs():
+    # The condition as transcribed from Mingone (2022, section 2.1), checked against the
+    # thing it claims: no pair it admits crosses, though some have psi / theta rising.
+    k = np.linspace(-3, 3, 2001)
+    rng = np.random.default_rng(0)
+    admitted = rising = 0
+    while admitted < 500:
+        earlier = (rng.uniform(0.005, 0.1), *rng.uniform(0.05, 1.5, 2))
+        later = (earlier[0] * rng.uniform(1.01, 3), *(np.array(earlier[1:]) * rng.uniform(1, 3, 2)))
+        valid = all(max(a, b) < 4 and (a + b) * max(a, b) <= 8 * t for t, a, b in (earlier, later))
+        if not valid or second_branch_margin(earlier, later) < 0:
+            continue
+        admitted += 1
+        rising += _psi_over_theta(*later) > _psi_over_theta(*earlier)
+        assert np.all(essvi_total_variance(k, *later) >= essvi_total_variance(k, *earlier) - 1e-12)
+    assert rising > 100
+
+
+def test_second_branch_admits_what_the_first_refuses():
+    earlier, later = RISING
+    assert _psi_over_theta(*later) > _psi_over_theta(*earlier)
+    assert second_branch_margin(earlier, later) > 0
+    assert interpolates_without_calendar_arbitrage(earlier, later)
+
+
+def test_interpolation_check_catches_a_crossing_between_pillars():
+    earlier, later = CROSSING_BETWEEN
+    assert second_branch_margin(earlier, later) > 0
+    assert not interpolates_without_calendar_arbitrage(earlier, later)
+    start, end = np.array(earlier), np.array(later)
+    dense = [lambda k, w=w: essvi_total_variance(k, *(start + w * (end - start)))
+             for w in np.linspace(0, 1, 65)]
+    assert calendar_violations(dense) > 0
+
+
+def test_essvi_fit_takes_the_second_branch_when_the_quotes_need_it():
+    # Quotes off the RISING pair: the first branch alone cannot reproduce them.
+    (t1, a1, b1), (t2, a2, b2) = RISING
+    table = smile_table([
+        (0.1, lambda k: essvi_total_variance(k, t1, a1, b1)),
+        (0.2, lambda k: essvi_total_variance(k, t2, a2, b2)),
+    ])
+    essvi = fit_essvi(table, fit_svi_surface(table, constrained=False))
+    np.testing.assert_allclose(essvi.thetas, [t1, t2], rtol=1e-4)
+    np.testing.assert_allclose(essvi.wings_call, [a1, a2], rtol=1e-3)
+    np.testing.assert_allclose(essvi.wings_put, [b1, b2], rtol=1e-3)
+    dense = [essvi.slice(t) for t in np.linspace(0.1, 0.2, 41)]
+    assert calendar_violations(dense) == 0
+    assert sum(butterfly_violations(s) for s in dense) == 0
 
 
 def test_essvi_needs_two_maturities():
